@@ -4,7 +4,7 @@ import sys
 import time
 from json import JSONEncoder
 import json
-import smbus
+import smbus2 as smbus
 
 from easydict import EasyDict as edict
 import numpy as np

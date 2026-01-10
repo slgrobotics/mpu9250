@@ -1,7 +1,7 @@
 import os
 import sys
 import time
-import smbus
+import smbus2 as smbus
 import math
 import numpy as np
 
