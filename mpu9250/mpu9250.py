@@ -12,7 +12,7 @@ from .imusensor.filters import madgwick
 import rclpy
 from rclpy.node import Node
 
-from sensor_msgs.msg import Imu
+from sensor_msgs.msg import Imu, MagneticField
 
 from math import sin, cos, radians
 import tf_transformations
@@ -52,9 +52,11 @@ class MyPythonNode(Node):
         self.imu.MagBias = np.asarray(self.get_parameter('magnetometer_bias')._value)
         self.imu.Magtransform = np.reshape(np.asarray(self.get_parameter('magnetometer_transform')._value),(3,3))
 
-        self.publisher_imu_values_ = self.create_publisher(Imu, "/imu", 10)
+        self.publisher_imu_values_ = self.create_publisher(Imu, "/imu/data", 10)  # fused IMU values
         self.timer_publish_imu_values_ = self.create_timer(
             1.0/self.get_parameter('frequency')._value, self.publish_imu_values)
+
+        self.publisher_mag_values_ = self.create_publisher(MagneticField, "/imu/mag", 10)  # raw magnetometer values
 
         self.sensorfusion = kalman.Kalman()
         #self.sensorfusion = madgwick.Madgwick(0.5)
@@ -116,6 +118,14 @@ class MyPythonNode(Node):
         msg.orientation.z = quat[2]
         msg.orientation.w = quat[3]
         self.publisher_imu_values_.publish(msg)
+
+        msg_mag = MagneticField()
+        msg_mag.header.stamp = self.get_clock().now().to_msg()
+        msg_mag.header.frame_id = self.get_parameter('frame_id')._value
+        msg_mag.magnetic_field.x = self.imu.MagVals[0]
+        msg_mag.magnetic_field.y = self.imu.MagVals[1]
+        msg_mag.magnetic_field.z = self.imu.MagVals[2]
+        self.publisher_mag_values_.publish(msg_mag)
 
         if(self.get_parameter('print')._value) :
             #print("roll: {:8.2f} \tpitch : {:8.2f} \tyaw : {:8.2f}".format(self.sensorfusion.roll, self.sensorfusion.pitch, self.sensorfusion.yaw))
