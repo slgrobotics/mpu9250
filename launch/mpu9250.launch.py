@@ -9,17 +9,17 @@ def generate_launch_description():
             executable="mpu9250",
             name="mpu9250",
             parameters=[{
-                "print", False,
-                "frequency", 30,
-                "frame_id", "imu_link",
-                "i2c_address", 0x68,  # also, 0x0C shows up for built-in AK8963 magnetometer
-                "i2c_port", 1,        # a.k.a "bus". For Linux on Raspberry Pi Bus=1
-                "acceleration_scale", [1.0, 1.0, 1.0],
-                "acceleration_bias", [0.0, 0.0, 0.0],
-                "gyro_bias", [0.0, 0.0, 0.0],
-                "magnetometer_scale", [1.0, 1.0, 1.0],
-                "magnetometer_bias", [1.0, 1.0, 1.0],
-                "magnetometer_transform", [
+                "print": False,
+                "frequency": 30,
+                "frame_id": "imu_link",
+                "i2c_address": 0x68,  # also, 0x0C shows up for built-in AK8963 magnetometer
+                "i2c_port": 1,        # a.k.a "bus". For Linux on Raspberry Pi Bus=1
+                "acceleration_scale": [1.0, 1.0, 1.0],
+                "acceleration_bias": [0.0, 0.0, 0.0],
+                "gyro_bias": [0.0, 0.0, 0.0],
+                "magnetometer_scale": [1.0, 1.0, 1.0],
+                "magnetometer_bias": [1.0, 1.0, 1.0],
+                "magnetometer_transform": [
                     1.0, 0.0, 0.0,
                     0.0, 1.0, 0.0,
                     0.0, 0.0, 1.0]
