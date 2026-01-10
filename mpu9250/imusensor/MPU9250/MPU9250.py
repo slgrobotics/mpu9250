@@ -112,7 +112,9 @@ def getConfigVals():
 
 	# end of register declaration
 
-	cfg.transformationMatrix = np.array([[0.0,1.0,0.0],[1.0,0.0,0.0],[0.0,0.0,-1.0]]).astype(np.int16)
+	cfg.transformationMatrixAG  = np.array([[0.0,1.0,0.0],[1.0,0.0,0.0],[0.0,0.0,-1.0]]).astype(np.int16)
+	cfg.transformationMatrixMag = np.array([[0.0,1.0,0.0],[1.0,0.0,0.0],[0.0,0.0,-1.0]]).astype(np.int16)
+
 	cfg.I2CRate = 400000
 	cfg.TempScale = 333.87
 	cfg.TempOffset = 21.0
@@ -129,7 +131,7 @@ class MPU9250:
 	"""
 	An interface between MPU9250 and rpi using I2C protocol
 
-	It has various fuctions from caliberation to computing orientation
+	It has various fuctions from calibration to computing orientation
 
 	"""
 
@@ -316,26 +318,78 @@ class MPU9250:
 			return -1
 		return 1
 
+	""" Never used functions kept for reference """
 	def readRawSensor(self):
 		"""Reading raw values of accelerometer, gyroscope and magnetometer
 
 		"""
 
-		data = self.__readRegisters(self.cfg.AccelOut, 20)
+		data = self.__readRegisters(self.cfg.AccelOut, 21)
 
 		data = np.array(data).astype(np.int16)
 		highbits = data[::2]<<8
 		vals = highbits + data[1::2]
 
-		self.RawAccelVals = np.squeeze(self.cfg.transformationMatrix.dot((vals[np.newaxis,:3].T)))*self.AccelScale
-		self.RawGyroVals = np.squeeze(self.cfg.transformationMatrix.dot((vals[np.newaxis,4:7].T)))*self.GyroScale
+		self.RawAccelVals = np.squeeze(self.cfg.transformationMatrixAG.dot((vals[np.newaxis,:3].T)))*self.AccelScale
+		self.RawGyroVals = np.squeeze(self.cfg.transformationMatrixAG.dot((vals[np.newaxis,4:7].T)))*self.GyroScale
 		self.RawMagVals = (vals[-3:])*self.MagScale 
 		self.RawTemp = vals[3]
 
 	def readSensor(self):
+		"""Read accel/gyro/mag + apply calibration + optional transforms."""
+
+		# Read 21 bytes; last byte is usually status/unused -> drop it
+		data = np.asarray(self.__readRegisters(self.cfg.AccelOut, 21)[:-1], dtype=np.uint8)
+
+		# Interpret as signed 16-bit big-endian pairs
+		# data layout: [H,L,H,L,...]
+		vals_u16 = (data[0::2].astype(np.uint16) << 8) | data[1::2].astype(np.uint16)
+		vals = vals_u16.view(np.int16)
+		# Extract raw vectors (still int16, signed, Big Endian) - head of the stream
+		a_raw = vals[0:3]
+		temp_raw = vals[3]
+		g_raw = vals[4:7]
+
+		# Mag bytes (signed, Little Endian) are in the tail of the original byte stream (offset 14)
+		mag_bytes = data[14:]
+		mag_u16 = (mag_bytes[1::2].astype(np.uint16) << 8) | mag_bytes[0::2].astype(np.uint16)
+		magvals = mag_u16.view(np.int16)
+
+		m_raw = magvals[-3:]
+
+		# ---- Calibrate in sensor frame (scale then bias) ----
+		# Assumption: Bias arrays are in scaled units (same units as raw*scale)
+		a_cal = (a_raw.astype(np.float64) * self.AccelScale - self.AccelBias) * self.Accels
+		g_cal = (g_raw.astype(np.float64) * self.GyroScale - self.GyroBias)   # <-- FIX: no *GyroScale twice
+		m_cal = (m_raw.astype(np.float64) * self.MagScale  - self.MagBias)   * self.Mags
+
+		# Keep "calibrated in sensor frame" outputs (we call it "Raw")
+		self.RawAccelVals = a_cal
+		self.RawGyroVals  = g_cal
+		self.RawMagVals   = m_cal
+
+        # ---- Apply hardcoded axis transform to accel/gyro ----
+		T = self.cfg.transformationMatrixAG  # expected shape (3,3)
+		Tm = self.cfg.transformationMatrixMag  # expected shape (3,3)
+		# This is faster/cleaner than dot + squeeze + transpose
+		self.AccelVals = T @ a_cal
+		self.GyroVals  = T @ g_cal
+
+		# ---- Mag optional transform from "magnetometer_transform" parameter ----
+		m_out = Tm @ m_cal
+		if self.Magtransform is None:
+			self.MagVals = m_out
+		else:
+			# Magtransform is 3x3, do matrix multiply
+			self.MagVals = self.Magtransform @ m_out
+
+		self.Temp = (temp_raw - self.cfg.TempOffset)/self.cfg.TempScale + self.cfg.TempOffset
+
+	""" Old readSensor function kept for reference """
+	def readSensorOld(self):
 		"""Reading values of accelerometer, gyroscope and magnetometer 
 
-		The functions finds values by applying caliberation values.
+		The functions finds values by applying calibration values.
 
 		"""
 
@@ -348,8 +402,12 @@ class MPU9250:
 		magHighbits = magData[1::2]<<8
 		magvals = magHighbits + magData[::2]
 
-		self.AccelVals = (np.squeeze(self.cfg.transformationMatrix.dot((vals[np.newaxis,:3].T)))*self.AccelScale - self.AccelBias)*self.Accels
-		self.GyroVals = np.squeeze(self.cfg.transformationMatrix.dot((vals[np.newaxis,4:7].T)))*self.GyroScale - self.GyroBias
+		self.RawAccelVals = (vals[:3] * self.AccelScale - self.AccelBias) * self.Accels
+		self.RawGyroVals = (vals[4:7] * self.GyroScale - self.GyroBias) * self.GyroScale
+		self.RawMagVals = (magvals[-3:] * self.MagScale - self.MagBias) * self.Mags
+
+		self.AccelVals = (np.squeeze(self.cfg.transformationMatrixAG.dot((vals[np.newaxis,:3].T)))*self.AccelScale - self.AccelBias)*self.Accels
+		self.GyroVals = np.squeeze(self.cfg.transformationMatrixAG.dot((vals[np.newaxis,4:7].T)))*self.GyroScale - self.GyroBias
 
 		if self.Magtransform is None:
 			self.MagVals = ((magvals[-3:])*self.MagScale - self.MagBias)*self.Mags
@@ -385,7 +443,7 @@ class MPU9250:
 	def caliberateAccelerometer(self):
 		"""Caliberate Accelerometer by positioning it in 6 different positions
 		
-		This function expects the user to keep the imu in 6 different positions while caliberation. 
+		This function expects the user to keep the imu in 6 different positions while calibration. 
 		It gives cues on when to change the position. It is expected that in all the 6 positions, 
 		at least one axis of IMU is parallel to gravity of earth and no position is same. Hence we 
 		get 6 positions namely -> +x, -x, +y, -y, +z, -z.
@@ -563,7 +621,7 @@ class MPU9250:
 		return center, evecs, radii, v
 
 	def saveCalibDataToFile(self, filePath):
-		""" Save the caliberation vaslues
+		""" Save the calibration values
 
 		Parameters
 		----------
@@ -597,7 +655,7 @@ class MPU9250:
 			json.dump(calibVals, outFile, cls =NumpyArrayEncoder)
 
 	def loadCalibDataFromFile(self, filePath):
-		""" Save the caliberation vaslues
+		""" Save the calibration values
 
 		Parameters
 		----------
