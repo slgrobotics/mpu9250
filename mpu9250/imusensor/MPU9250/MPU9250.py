@@ -112,6 +112,20 @@ def getConfigVals():
 
 	# end of register declaration
 
+	"""
+	The MPU-9250 accelerometer and gyroscope share the same body-frame axis orientation (they are on the same die).
+
+	The onboard magnetometer (AK8963/AK09916) is physically on a separate die, mounted with a different internal
+	  orientation relative to the accel/gyro die within the chip, so its raw axes do not align with the body frame.
+
+	As a result, the magnetometer readings must be remapped (axis swaps and sign flips) in software
+	  to match the accelerometer/gyroscope frame before sensor fusion (e.g., Madgwick or EKF).
+
+	The exact mapping is board- and implementation-dependent, but a common transformation:
+	 - swaps X/Y and
+	 - flips Z	
+	"""
+
 	cfg.transformationMatrixAG  = np.array([[0.0,1.0,0.0],[1.0,0.0,0.0],[0.0,0.0,-1.0]]).astype(np.int16)
 	cfg.transformationMatrixMag = np.array([[0.0,1.0,0.0],[1.0,0.0,0.0],[0.0,0.0,-1.0]]).astype(np.int16)
 
