@@ -11,7 +11,7 @@ from rclpy.node import Node
 
 from sensor_msgs.msg import Imu, MagneticField, Temperature
 
-from math import sin, cos, radians
+from math import radians
 import tf_transformations
 
 
@@ -109,6 +109,7 @@ class MPU9250Node(Node):
                 self.imu.MagVals[0], self.imu.MagVals[1], self.imu.MagVals[2], deltaTime)
 
             # RPY should be in the ENU (East-North-Up) reference frame, in degrees
+            # sensor frame (REP-103 body: x forward, y left, z up), world frame (ENU)
             roll = self.sensorfusion.roll
             pitch = self.sensorfusion.pitch
             yaw = self.sensorfusion.yaw
@@ -176,7 +177,7 @@ class MPU9250Node(Node):
             msg_temp.header.stamp = msg_imu.header.stamp
             msg_temp.header.frame_id = frame_id
             msg_temp.temperature = round(avg_temp_c, 2)  # Celsius
-            msg_temp.variance = 0.0 # 0 means unknown
+            msg_temp.variance = 0.25 # +- 0.5 degrees C squared
             self.publisher_temperature.publish(msg_temp)
             # Reset accumulator for next window
             self._temp_sum_c = 0.0
