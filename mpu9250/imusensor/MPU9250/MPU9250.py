@@ -222,8 +222,8 @@ class MPU9250:
 		self.__writeRegister(self.cfg.PowerManagement1, self.cfg.ClockPLL)
 		self.__readAK8963Registers(self.cfg.Ak8963HXL, 7)
 
-		# Caliberating Gyro 
-		self.caliberateGyro()
+		# Calibrating Gyro 
+		self.calibrateGyro()
 
 		return 1
 
@@ -430,7 +430,7 @@ class MPU9250:
 
 		self.Temp = (vals[3] - self.cfg.TempOffset)/self.cfg.TempScale + self.cfg.TempOffset
 
-	def caliberateGyro(self):
+	def calibrateGyro(self):
 		"""Calibrates gyroscope by finding the bias sets the gyro bias
 
 		"""
@@ -454,8 +454,8 @@ class MPU9250:
 		self.setLowPassFilterFrequency(currentFrequency)
 		self.setSRD(currentSRD)
 
-	def caliberateAccelerometer(self):
-		"""Caliberate Accelerometer by positioning it in 6 different positions
+	def calibrateAccelerometer(self):
+		"""Calibrate Accelerometer by positioning it in 6 different positions
 		
 		This function expects the user to keep the imu in 6 different positions while calibration. 
 		It gives cues on when to change the position. It is expected that in all the 6 positions, 
@@ -536,8 +536,8 @@ class MPU9250:
 		meanvals = np.array([accelvals[:,0].mean(), accelvals[:,1].mean(), accelvals[:,2].mean()])
 		return meanvals
 
-	def caliberateMagApprox(self):
-		"""Caliberate Magnetometer
+	def calibrateMagApprox(self):
+		"""Calibrate Magnetometer
 		
 		This function uses basic methods like averaging and scaling to find the hard iron
 		and soft iron effects.
@@ -564,8 +564,8 @@ class MPU9250:
 
 		self.setSRD(currentSRD)
 
-	def caliberateMagPrecise(self):
-		"""Caliberate Magnetometer Use this method for more precise calculation
+	def calibrateMagPrecise(self):
+		"""Calibrate Magnetometer Use this method for more precise calculation
 		
 		This function uses ellipsoid fitting to get an estimate of the bias and
 		transformation matrix required for mag data
