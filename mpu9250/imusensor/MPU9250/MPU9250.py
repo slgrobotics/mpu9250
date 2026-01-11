@@ -102,8 +102,8 @@ def getConfigVals():
 	cfg.Ak8963HXL = 0x03
 	cfg.Ak8963CNTL1 = 0x0A
 	cfg.Ak8963PowerDown = 0x00
-	cfg.Ak8963ContinuosMeasurment1 = 0x12
-	cfg.Ak8963ContinuosMeasurment2 = 0x16
+	cfg.Ak8963ContinuosMeasurment1 = 0x12  # 16-bit resolution (0.15 microTesla/LSB) and Continuous Measurement Mode 1 (8 Hz)
+	cfg.Ak8963ContinuosMeasurment2 = 0x16  # 16-bit resolution (0.15 microTesla/LSB) and Continuous Measurement Mode 2 (100 Hz)
 	cfg.Ak8963FuseROM = 0x0F
 	cfg.Ak8963CNTL2 = 0x0B
 	cfg.Ak8963Reset = 0x01
@@ -375,7 +375,7 @@ class MPU9250:
 		# Assumption: Bias arrays are in scaled units (same units as raw*scale)
 		a_cal = (a_raw.astype(np.float64) * self.AccelScale - self.AccelBias) * self.Accels
 		g_cal = (g_raw.astype(np.float64) * self.GyroScale - self.GyroBias)   # <-- FIX: no *GyroScale twice
-		m_cal = (m_raw.astype(np.float64) * self.MagScale  - self.MagBias)   * self.Mags
+		m_cal = (m_raw.astype(np.float64) * self.MagScale  - self.MagBias)   * self.Mags * 0.15 / 1000000.0  # convert to Tesla
 
 		# Keep "calibrated in sensor frame" outputs (we call it "Raw")
 		self.RawAccelVals = a_cal
