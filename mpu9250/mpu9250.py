@@ -68,7 +68,10 @@ class MPU9250Node(Node):
         # Divider: publish temperature every N IMU ticks
         self._temp_div = max(1, int(round(pub_rate_hz / max(0.1, temp_pub_rate_hz))))
 
-        self.imu.begin()
+        self.imu.begin()  # takes time for quick gyro calibration, gets factory mag calibration
+
+        self.get_logger().info(f"Magnetometer Sensitivity Scales: {self.imu.MagScale}  LSB/Tesla")
+        # expect MagScale: [1.79882812e-07 1.79882812e-07 1.73437500e-07]
 
         if not self.raw_only:
             # Initialize sensor fusion algorithm:

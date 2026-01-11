@@ -189,9 +189,9 @@ class MPU9250:
 			print ("The name is wrong {0}".format(name))
 		self.__writeRegister(self.cfg.PowerManagement2, self.cfg.SensorEnable)
 
-		self.setAccelRange("AccelRangeSelect16G")
+		self.setAccelRange("AccelRangeSelect2G")
 
-		self.setGyroRange("GyroRangeSelect2000DPS")
+		self.setGyroRange("GyroRangeSelect250DPS")  # 250 degrees per second range for ground robots
 
 		self.setLowPassFilterFrequency("AccelLowPassFilter184")
 
@@ -210,9 +210,14 @@ class MPU9250:
 		time.sleep(0.1)
 		self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963ContinuosMeasurment2)
 		time.sleep(0.1)
+
+		# Accessing the mag's Factory Calibration (Fuse ROM):
 		self.MagScale = self.__readAK8963Registers(self.cfg.Ak8963ASA, 3)
 		self.MagScale = np.array(self.MagScale)
-		self.MagScale = (self.MagScale - 128.0)/(256.0 + 1.0)*(4912.0/32760.0)
+		# This "MagScale" official formula converts the register "bits" to Tesla:
+		self.MagScale = (((self.MagScale - 128.0)/256.0) + 1.0)*0.15/1000000.0  # approx 0.15*e-6 Tesla per LSB, on 3 axes
+
+		#print(f"Magnetometer Sensitivity Scales: {self.MagScale}  LSB/Tesla")  # MagScale: [1.79882812e-07 1.79882812e-07 1.73437500e-07]
 
 		self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963PowerDown)
 		time.sleep(0.1)
@@ -374,10 +379,10 @@ class MPU9250:
 		# ---- Calibrate in sensor frame (scale then bias) ----
 		# Assumption: Bias arrays are in scaled units (same units as raw*scale)
 		a_cal = (a_raw.astype(np.float64) * self.AccelScale - self.AccelBias) * self.Accels
-		g_cal = (g_raw.astype(np.float64) * self.GyroScale - self.GyroBias)   # <-- FIX: no *GyroScale twice
-		m_cal = (m_raw.astype(np.float64) * self.MagScale  - self.MagBias)   * self.Mags * 0.15 / 1000000.0  # convert to Tesla
+		g_cal = (g_raw.astype(np.float64) * self.GyroScale - self.GyroBias)  # GyroBias is calibrated in begin()
+		m_cal = (m_raw.astype(np.float64) * self.MagScale  - self.MagBias)   * self.Mags  # converted to Tesla and adjusted
 
-		# Keep "calibrated in sensor frame" outputs (we call it "Raw")
+		# Keep outputs "calibrated in sensor frame" (we call them "Raw Values")
 		self.RawAccelVals = a_cal
 		self.RawGyroVals  = g_cal
 		self.RawMagVals   = m_cal
