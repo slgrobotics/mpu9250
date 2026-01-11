@@ -110,46 +110,46 @@ class MPU9250Node(Node):
             # Convert yaw to the ENU (East-North_Up):
             yaw += 90.0
 
-        msg = Imu()
-        msg.header.stamp = now.to_msg()
-        msg.header.frame_id = frame_id
+        msg_imu = Imu()
+        msg_imu.header.stamp = now.to_msg()
+        msg_imu.header.frame_id = frame_id
         if self.raw_only:
             # Raw measurements, unknown covariance
-            msg.linear_acceleration.x = self.imu.RawAccelVals[0]
-            msg.linear_acceleration.y = self.imu.RawAccelVals[1]
-            msg.linear_acceleration.z = self.imu.RawAccelVals[2]
-            msg.linear_acceleration_covariance[0] = -1.0
+            msg_imu.linear_acceleration.x = self.imu.RawAccelVals[0]
+            msg_imu.linear_acceleration.y = self.imu.RawAccelVals[1]
+            msg_imu.linear_acceleration.z = self.imu.RawAccelVals[2]
+            msg_imu.linear_acceleration_covariance[0] = -1.0
 
-            msg.angular_velocity.x = self.imu.RawGyroVals[0]
-            msg.angular_velocity.y = self.imu.RawGyroVals[1]
-            msg.angular_velocity.z = self.imu.RawGyroVals[2]
-            msg.angular_velocity_covariance[0] = -1.0
+            msg_imu.angular_velocity.x = self.imu.RawGyroVals[0]
+            msg_imu.angular_velocity.y = self.imu.RawGyroVals[1]
+            msg_imu.angular_velocity.z = self.imu.RawGyroVals[2]
+            msg_imu.angular_velocity_covariance[0] = -1.0
 
             # No orientation in raw data
-            msg.orientation_covariance[0] = -1.0
+            msg_imu.orientation_covariance[0] = -1.0
         else:
             # Fused measurements with covariance
-            msg.linear_acceleration.x = self.imu.AccelVals[0]
-            msg.linear_acceleration.y = self.imu.AccelVals[1]
-            msg.linear_acceleration.z = self.imu.AccelVals[2]
-            msg.linear_acceleration_covariance = [0.0025, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0025]
+            msg_imu.linear_acceleration.x = self.imu.AccelVals[0]
+            msg_imu.linear_acceleration.y = self.imu.AccelVals[1]
+            msg_imu.linear_acceleration.z = self.imu.AccelVals[2]
+            msg_imu.linear_acceleration_covariance = [0.0025, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0025]
 
-            msg.angular_velocity.x = (self.imu.GyroVals[0]) #TODO this is acceleration not velocity (?!)
-            msg.angular_velocity.y = (self.imu.GyroVals[1]) #TODO this is acceleration not velocity (?!)
-            msg.angular_velocity.z = (self.imu.GyroVals[2]) #TODO this is acceleration not velocity (?!)
-            msg.angular_velocity_covariance = [0.0025, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0025]
+            msg_imu.angular_velocity.x = (self.imu.GyroVals[0]) #TODO this is acceleration not velocity (?!)
+            msg_imu.angular_velocity.y = (self.imu.GyroVals[1]) #TODO this is acceleration not velocity (?!)
+            msg_imu.angular_velocity.z = (self.imu.GyroVals[2]) #TODO this is acceleration not velocity (?!)
+            msg_imu.angular_velocity_covariance = [0.0025, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0025]
 
             # Calculate euler angles, convert to quaternion and store in message
             # Convert to quaternion
             yaw_r = self.wrap_pi(radians(yaw))
             quat = tf_transformations.quaternion_from_euler(radians(roll), radians(pitch), yaw_r)
-            msg.orientation.x = quat[0]
-            msg.orientation.y = quat[1]
-            msg.orientation.z = quat[2]
-            msg.orientation.w = quat[3]
-            msg.orientation_covariance = [0.0025, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0025]
+            msg_imu.orientation.x = quat[0]
+            msg_imu.orientation.y = quat[1]
+            msg_imu.orientation.z = quat[2]
+            msg_imu.orientation.w = quat[3]
+            msg_imu.orientation_covariance = [0.0025, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0025]
 
-        self.publisher_imu_values_.publish(msg)
+        self.publisher_imu_values_.publish(msg_imu)
 
         msg_mag = MagneticField()
         msg_mag.header.stamp = now.to_msg()
@@ -168,12 +168,12 @@ class MPU9250Node(Node):
 
         if publish_temp_now:
             avg_temp_c = self._temp_sum_c / float(self._temp_count)
-            temp_msg = Temperature()
-            temp_msg.header.stamp = imu_raw_msg.header.stamp
-            temp_msg.header.frame_id = self.frame_id
-            temp_msg.temperature = round(avg_temp_c, 2)
-            temp_msg.variance = 0.0 # 0 means unknown
-            self.publisher_temperature.publish(temp_msg)
+            msg_temp = Temperature()
+            msg_temp.header.stamp = msg_imu.header.stamp
+            msg_temp.header.frame_id = frame_id
+            msg_temp.temperature = round(avg_temp_c, 2)
+            msg_temp.variance = 0.0 # 0 means unknown
+            self.publisher_temperature.publish(msg_temp)
             # Reset accumulator for next window
             self._temp_sum_c = 0.0
             self._temp_count = 0
