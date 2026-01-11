@@ -1,6 +1,4 @@
-import numpy as np
 import os
-import sys
 import time
 from json import JSONEncoder
 import json
@@ -304,7 +302,7 @@ class MPU9250:
 			self.__writeRegister(self.cfg.GyroConfig, self.cfg[gyroRange])
 			self.GyroRange = gyroRange
 		except:
-			print ("{0} is not a proper value for gyroscope range".format(gyroscope))
+			print ("{0} is not a proper value for gyroscope range".format(gyroRange))
 			return -1
 		gyroVal = float(gyroRange.split('t')[1].split('D')[0])
 		self.GyroScale = self.cfg.Degree2Radian*(gyroVal/32767.5)
@@ -336,23 +334,6 @@ class MPU9250:
 			print ("{0} is not a proper value forlow pass filter".format(frequency))
 			return -1
 		return 1
-
-	""" Never used functions kept for reference """
-	def readRawSensor(self):
-		"""Reading raw values of accelerometer, gyroscope and magnetometer
-
-		"""
-
-		data = self.__readRegisters(self.cfg.AccelOut, 21)
-
-		data = np.array(data).astype(np.int16)
-		highbits = data[::2]<<8
-		vals = highbits + data[1::2]
-
-		self.RawAccelVals = np.squeeze(self.cfg.transformationMatrixAG.dot((vals[np.newaxis,:3].T)))*self.AccelScale
-		self.RawGyroVals = np.squeeze(self.cfg.transformationMatrixAG.dot((vals[np.newaxis,4:7].T)))*self.GyroScale
-		self.RawMagVals = (vals[-3:])*self.MagScale 
-		self.RawTemp = vals[3]
 
 	def readSensor(self):
 		"""Read accel/gyro/mag + apply calibration + optional transforms."""
@@ -404,41 +385,8 @@ class MPU9250:
 
 		self.Temp = (temp_raw - self.cfg.TempOffset)/self.cfg.TempScale + self.cfg.TempOffset
 
-	""" Old readSensor function kept for reference """
-	def readSensorOld(self):
-		"""Reading values of accelerometer, gyroscope and magnetometer 
-
-		The functions finds values by applying calibration values.
-
-		"""
-
-		data = self.__readRegisters(self.cfg.AccelOut, 21)
-
-		data = np.array(data[:-1]).astype(np.int16)
-		magData = data[14:]
-		highbits = data[::2]<<8
-		vals = highbits + data[1::2]
-		magHighbits = magData[1::2]<<8
-		magvals = magHighbits + magData[::2]
-
-		self.RawAccelVals = (vals[:3] * self.AccelScale - self.AccelBias) * self.Accels
-		self.RawGyroVals = (vals[4:7] * self.GyroScale - self.GyroBias) * self.GyroScale
-		self.RawMagVals = (magvals[-3:] * self.MagScale - self.MagBias) * self.Mags
-
-		self.AccelVals = (np.squeeze(self.cfg.transformationMatrixAG.dot((vals[np.newaxis,:3].T)))*self.AccelScale - self.AccelBias)*self.Accels
-		self.GyroVals = np.squeeze(self.cfg.transformationMatrixAG.dot((vals[np.newaxis,4:7].T)))*self.GyroScale - self.GyroBias
-
-		if self.Magtransform is None:
-			self.MagVals = ((magvals[-3:])*self.MagScale - self.MagBias)*self.Mags
-		else:
-			self.MagVals = np.matmul((magvals[-3:])*self.MagScale - self.MagBias, self.Magtransform)
-
-		self.Temp = (vals[3] - self.cfg.TempOffset)/self.cfg.TempScale + self.cfg.TempOffset
-
 	def calibrateGyro(self):
-		"""Calibrates gyroscope by finding the bias sets the gyro bias
-
-		"""
+		"""Calibrates gyroscope by finding the bias sets the gyro bias"""
 
 		currentGyroRange = self.GyroRange
 		currentFrequency = self.Frequency
