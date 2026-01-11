@@ -178,8 +178,8 @@ class MPU9250Node(Node):
             self._temp_sum_c = 0.0
             self._temp_count = 0
 
-        # print not too often:
-        if self.get_parameter('print')._value and publish_temp_now:
+        # print only when fusion is enabled, and not too often:
+        if not self.raw_only and self.get_parameter('print')._value and publish_temp_now:
             #print("roll: {:8.2f} \tpitch : {:8.2f} \tyaw : {:8.2f}".format(self.sensorfusion.roll, self.sensorfusion.pitch, self.sensorfusion.yaw))
             #print("roll: {:8.2f} \tpitch : {:8.2f} \tyaw : {:8.2f}".format(roll, pitch, yaw_r))
             print("yaw : {:8.2f}".format(yaw_r))
