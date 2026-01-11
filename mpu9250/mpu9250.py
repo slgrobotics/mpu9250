@@ -32,7 +32,7 @@ class MPU9250Node(Node):
                 ('acceleration_bias', [0.0, 0.0, 0.0]),
                 ('gyro_bias', [0.0, 0.0, 0.0]),
                 ('magnetometer_scale', [1.0, 1.0, 1.0]),
-                ('magnetometer_bias', [1.0, 1.0, 1.0]),
+                ('magnetometer_bias', [0.0, 0.0, 0.0]),
                 ('magnetometer_transform', [
                     1.0, 0.0, 0.0,
                     0.0, 1.0, 0.0,
@@ -40,19 +40,19 @@ class MPU9250Node(Node):
             ]
         )
 
-        address = self.get_parameter('i2c_address')._value
-        bus = smbus.SMBus(self.get_parameter('i2c_port')._value)
+        address = self.get_parameter('i2c_address').value
+        bus = smbus.SMBus(self.get_parameter('i2c_port').value)
         self.imu = MPU9250.MPU9250(bus, address)
-        self.raw_only = self.get_parameter('raw_only')._value
+        self.raw_only = self.get_parameter('raw_only').value
 
-        self.imu.Accels = np.asarray(self.get_parameter('acceleration_scale')._value)
-        self.imu.AccelBias = np.asarray(self.get_parameter('acceleration_bias')._value)
-        self.imu.GyroBias = np.asarray(self.get_parameter('gyro_bias')._value)
-        self.imu.Mags = np.asarray(self.get_parameter('magnetometer_scale')._value)
-        self.imu.MagBias = np.asarray(self.get_parameter('magnetometer_bias')._value)
-        self.imu.Magtransform = np.reshape(np.asarray(self.get_parameter('magnetometer_transform')._value),(3,3))
+        self.imu.Accels = np.asarray(self.get_parameter('acceleration_scale').value)
+        self.imu.AccelBias = np.asarray(self.get_parameter('acceleration_bias').value)
+        self.imu.GyroBias = np.asarray(self.get_parameter('gyro_bias').value)
+        self.imu.Mags = np.asarray(self.get_parameter('magnetometer_scale').value)
+        self.imu.MagBias = np.asarray(self.get_parameter('magnetometer_bias').value)
+        self.imu.Magtransform = np.reshape(np.asarray(self.get_parameter('magnetometer_transform').value),(3,3))
 
-        pub_rate_hz = self.get_parameter('frequency')._value
+        pub_rate_hz = self.get_parameter('frequency').value
         self.timer_publish_imu_values_ = self.create_timer(1.0/pub_rate_hz, self.publish_imu_values)
 
         self.publisher_imu_values_ = self.create_publisher(Imu, "/imu/data_raw" if self.raw_only else "/imu/data", 10)  # raw or fused IMU values
@@ -68,17 +68,20 @@ class MPU9250Node(Node):
         # Divider: publish temperature every N IMU ticks
         self._temp_div = max(1, int(round(pub_rate_hz / max(0.1, temp_pub_rate_hz))))
 
+        self.imu.begin()
+
         if not self.raw_only:
+            # Initialize sensor fusion algorithm:
             self.sensorfusion = kalman.Kalman()
             #self.sensorfusion = madgwick.Madgwick(0.5)
-            self.imu.begin()
+
+            # Initial read to set roll/pitch/yaw:
             self.imu.readSensor()    
             self.imu.computeOrientation()
             self.sensorfusion.roll = self.imu.roll
             self.sensorfusion.pitch = self.imu.pitch
             self.sensorfusion.yaw = self.imu.yaw
 
-        self.deltaTime = 0
         self.lastTime = self.get_clock().now()
 
     def wrap_pi(self, angle):
@@ -88,9 +91,10 @@ class MPU9250Node(Node):
     def publish_imu_values(self):
         self.imu.readSensor()
         now = self.get_clock().now()
-        deltaTime = (now - self.lastTime).nanoseconds * 10e9
+        deltaTime = (now - self.lastTime).nanoseconds * 1e-9  # seconds (float)
+        deltaTime = max(1e-4, min(deltaTime, 0.2))  # clamp to reasonable range
         self.lastTime = now
-        frame_id = self.get_parameter('frame_id')._value
+        frame_id = self.get_parameter('frame_id').value
 
         if not self.raw_only:
             #self.imu.computeOrientation()
@@ -99,28 +103,28 @@ class MPU9250Node(Node):
             #roll = self.imu.roll
             #computeAndUpdateRollPitchYaw
 
-            self.sensorfusion.computeAndUpdateRollPitchYaw(\
-                self.imu.AccelVals[0], self.imu.AccelVals[1], self.imu.AccelVals[2],\
-                self.imu.GyroVals[0], self.imu.GyroVals[1], self.imu.GyroVals[2],\
+            self.sensorfusion.computeAndUpdateRollPitchYaw(
+                self.imu.AccelVals[0], self.imu.AccelVals[1], self.imu.AccelVals[2],
+                self.imu.GyroVals[0], self.imu.GyroVals[1], self.imu.GyroVals[2],
                 self.imu.MagVals[0], self.imu.MagVals[1], self.imu.MagVals[2], deltaTime)
-            yaw = self.sensorfusion.yaw
-            pitch = self.sensorfusion.pitch
-            roll = self.sensorfusion.roll
 
-            # Convert yaw to the ENU (East-North_Up):
-            yaw += 90.0
+            # RPY should be in the ENU (East-North-Up) reference frame, in degrees
+            roll = self.sensorfusion.roll
+            pitch = self.sensorfusion.pitch
+            yaw = self.sensorfusion.yaw
 
         msg_imu = Imu()
         msg_imu.header.stamp = now.to_msg()
         msg_imu.header.frame_id = frame_id
+
         if self.raw_only:
             # Raw measurements, unknown covariance
-            msg_imu.linear_acceleration.x = self.imu.RawAccelVals[0]
+            msg_imu.linear_acceleration.x = self.imu.RawAccelVals[0]  # m/s^2
             msg_imu.linear_acceleration.y = self.imu.RawAccelVals[1]
             msg_imu.linear_acceleration.z = self.imu.RawAccelVals[2]
             msg_imu.linear_acceleration_covariance[0] = -1.0
 
-            msg_imu.angular_velocity.x = self.imu.RawGyroVals[0]
+            msg_imu.angular_velocity.x = self.imu.RawGyroVals[0]  # rad/s
             msg_imu.angular_velocity.y = self.imu.RawGyroVals[1]
             msg_imu.angular_velocity.z = self.imu.RawGyroVals[2]
             msg_imu.angular_velocity_covariance[0] = -1.0
@@ -129,15 +133,15 @@ class MPU9250Node(Node):
             msg_imu.orientation_covariance[0] = -1.0
         else:
             # Fused measurements with covariance
-            msg_imu.linear_acceleration.x = self.imu.AccelVals[0]
+            msg_imu.linear_acceleration.x = self.imu.AccelVals[0]  # m/s^2
             msg_imu.linear_acceleration.y = self.imu.AccelVals[1]
             msg_imu.linear_acceleration.z = self.imu.AccelVals[2]
-            msg_imu.linear_acceleration_covariance = [0.0025, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0025]
+            msg_imu.linear_acceleration_covariance = [0.10, 0.0, 0.0, 0.0, 0.10, 0.0, 0.0, 0.0, 0.10]
 
-            msg_imu.angular_velocity.x = (self.imu.GyroVals[0]) #TODO this is acceleration not velocity (?!)
-            msg_imu.angular_velocity.y = (self.imu.GyroVals[1]) #TODO this is acceleration not velocity (?!)
-            msg_imu.angular_velocity.z = (self.imu.GyroVals[2]) #TODO this is acceleration not velocity (?!)
-            msg_imu.angular_velocity_covariance = [0.0025, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0025]
+            msg_imu.angular_velocity.x = (self.imu.GyroVals[0])  # rad/s
+            msg_imu.angular_velocity.y = (self.imu.GyroVals[1])
+            msg_imu.angular_velocity.z = (self.imu.GyroVals[2])
+            msg_imu.angular_velocity_covariance = [0.02, 0.0, 0.0, 0.0, 0.02, 0.0, 0.0, 0.0, 0.02]
 
             # Calculate euler angles, convert to quaternion and store in message
             # Convert to quaternion
@@ -147,7 +151,7 @@ class MPU9250Node(Node):
             msg_imu.orientation.y = quat[1]
             msg_imu.orientation.z = quat[2]
             msg_imu.orientation.w = quat[3]
-            msg_imu.orientation_covariance = [0.0025, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0025]
+            msg_imu.orientation_covariance = [0.05, 0.0, 0.0, 0.0, 0.05, 0.0, 0.0, 0.0, 0.10]
 
         self.publisher_imu_values_.publish(msg_imu)
 
@@ -156,7 +160,7 @@ class MPU9250Node(Node):
         msg_mag.header.frame_id = frame_id
         # mag covariance unknown for now - uncalibrated mag, no noise model
         msg_mag.magnetic_field_covariance[0] = -1.0
-        msg_mag.magnetic_field.x = self.imu.RawMagVals[0]
+        msg_mag.magnetic_field.x = self.imu.RawMagVals[0]  # Tesla
         msg_mag.magnetic_field.y = self.imu.RawMagVals[1]
         msg_mag.magnetic_field.z = self.imu.RawMagVals[2]
         self.publisher_mag_values_.publish(msg_mag)
@@ -171,7 +175,7 @@ class MPU9250Node(Node):
             msg_temp = Temperature()
             msg_temp.header.stamp = msg_imu.header.stamp
             msg_temp.header.frame_id = frame_id
-            msg_temp.temperature = round(avg_temp_c, 2)
+            msg_temp.temperature = round(avg_temp_c, 2)  # Celsius
             msg_temp.variance = 0.0 # 0 means unknown
             self.publisher_temperature.publish(msg_temp)
             # Reset accumulator for next window
@@ -179,10 +183,10 @@ class MPU9250Node(Node):
             self._temp_count = 0
 
         # print only when fusion is enabled, and not too often:
-        if not self.raw_only and self.get_parameter('print')._value and publish_temp_now:
+        if not self.raw_only and self.get_parameter('print').value and publish_temp_now:
             #print("roll: {:8.2f} \tpitch : {:8.2f} \tyaw : {:8.2f}".format(self.sensorfusion.roll, self.sensorfusion.pitch, self.sensorfusion.yaw))
             #print("roll: {:8.2f} \tpitch : {:8.2f} \tyaw : {:8.2f}".format(roll, pitch, yaw_r))
-            print("yaw : {:8.2f}".format(yaw_r))
+            print(f"yaw : {math.degrees(yaw_r):8.2f}")
 
 def main(args=None):
     rclpy.init(args=args)
@@ -200,13 +204,6 @@ def main(args=None):
             rclpy.shutdown()
         except Exception:
             pass
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = MPU9250Node()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
 
 if __name__ == "__main__":
     main()
