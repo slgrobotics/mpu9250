@@ -40,6 +40,8 @@ class MPU9250Node(Node):
             ]
         )
 
+        self.logger = self.get_logger()
+
         address = self.get_parameter('i2c_address').value
         bus = smbus.SMBus(self.get_parameter('i2c_port').value)
         self.imu = MPU9250.MPU9250(bus, address)
@@ -70,8 +72,9 @@ class MPU9250Node(Node):
 
         self.imu.begin()  # takes time for quick gyro calibration, gets factory mag calibration
 
-        self.get_logger().info(f"Magnetometer Sensitivity Scales: {self.imu.MagScale}  LSB/Tesla")
         # expect MagScale: [1.79882812e-07 1.79882812e-07 1.73437500e-07]
+        self.logger.info(f"Magnetometer Sensitivity Scales: {self.imu.MagScale}  LSB/Tesla")
+        self.logger.info(f"Gyro Bias: {self.imu.GyroBias}  rad/s")
 
         if not self.raw_only:
             # Initialize sensor fusion algorithm:
