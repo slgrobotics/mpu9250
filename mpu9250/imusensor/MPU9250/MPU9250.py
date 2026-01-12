@@ -159,9 +159,9 @@ class MPU9250:
 		self.AccelBias = np.array([0.0, 0.0, 0.0])
 		self.Accels = np.array([1.0, 1.0, 1.0])
 		self.MagBias = np.array([0.0, 0.0, 0.0])
-		self.Mags = np.array([1.0, 1.0, 1.0])
-		self.GyroBias = np.array([0.0, 0.0, 0.0])
-		self.Magtransform = None
+		self.Mags = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
+		self.GyroBias = np.array([0.0, 0.0, 0.0])  # will be set in begin() after short gyro calibration
+		self.Magtransform = None  # magnetometer calibration is unknown
 
 	def begin(self):
 		"""
@@ -363,13 +363,8 @@ class MPU9250:
 		g_cal = (g_raw.astype(np.float64) * self.GyroScale - self.GyroBias)  # GyroBias is calibrated in begin()
 		m_cal = (m_raw.astype(np.float64) * self.MagScale  - self.MagBias)   * self.Mags  # converted to Tesla and adjusted
 
-		# Keep outputs "calibrated in sensor frame" (we call them "Raw Values")
-		self.RawAccelVals = a_cal
-		self.RawGyroVals  = g_cal
-		self.RawMagVals   = m_cal
-
         # ---- Apply hardcoded axis transform to accel/gyro ----
-		T = self.cfg.transformationMatrixAG  # expected shape (3,3)
+		T = self.cfg.transformationMatrixAG    # expected shape (3,3)
 		Tm = self.cfg.transformationMatrixMag  # expected shape (3,3)
 		# This is faster/cleaner than dot + squeeze + transpose
 		self.AccelVals = T @ a_cal
@@ -380,7 +375,7 @@ class MPU9250:
 		if self.Magtransform is None:
 			self.MagVals = m_out
 		else:
-			# Magtransform is 3x3, do matrix multiply
+			# Magtransform is 3x3, do matrix multiply - values will be corrected for soft-iron distortion
 			self.MagVals = self.Magtransform @ m_out
 
 		self.Temp = (temp_raw - self.cfg.TempOffset)/self.cfg.TempScale + self.cfg.TempOffset

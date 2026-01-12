@@ -126,14 +126,14 @@ class MPU9250Node(Node):
 
         if self.raw_only:
             # Raw measurements, unknown covariance
-            msg_imu.linear_acceleration.x = self.imu.RawAccelVals[0]  # m/s^2
-            msg_imu.linear_acceleration.y = self.imu.RawAccelVals[1]
-            msg_imu.linear_acceleration.z = self.imu.RawAccelVals[2]
+            msg_imu.linear_acceleration.x = self.imu.AccelVals[0]  # m/s^2
+            msg_imu.linear_acceleration.y = self.imu.AccelVals[1]
+            msg_imu.linear_acceleration.z = self.imu.AccelVals[2]
             msg_imu.linear_acceleration_covariance[0] = -1.0
 
-            msg_imu.angular_velocity.x = self.imu.RawGyroVals[0]  # rad/s
-            msg_imu.angular_velocity.y = self.imu.RawGyroVals[1]
-            msg_imu.angular_velocity.z = self.imu.RawGyroVals[2]
+            msg_imu.angular_velocity.x = self.imu.GyroVals[0]  # rad/s
+            msg_imu.angular_velocity.y = self.imu.GyroVals[1]
+            msg_imu.angular_velocity.z = self.imu.GyroVals[2]
             msg_imu.angular_velocity_covariance[0] = -1.0
 
             # No orientation in raw data
@@ -167,9 +167,9 @@ class MPU9250Node(Node):
         msg_mag.header.frame_id = frame_id
         # mag covariance unknown for now - uncalibrated mag, no noise model
         msg_mag.magnetic_field_covariance[0] = -1.0
-        msg_mag.magnetic_field.x = self.imu.RawMagVals[0]  # Tesla
-        msg_mag.magnetic_field.y = self.imu.RawMagVals[1]
-        msg_mag.magnetic_field.z = self.imu.RawMagVals[2]
+        msg_mag.magnetic_field.x = self.imu.MagVals[0]  # Tesla
+        msg_mag.magnetic_field.y = self.imu.MagVals[1]
+        msg_mag.magnetic_field.z = self.imu.MagVals[2]
         self.publisher_mag_values_.publish(msg_mag)
 
         # Accumulate temp for averaging
