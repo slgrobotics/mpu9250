@@ -1,6 +1,10 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
+#
+#  colcon build; source install/setup.bash; ros2 launch mpu9250 mpu9250_raw.launch.py
+#
+
 def generate_launch_description():
 
     return LaunchDescription([
