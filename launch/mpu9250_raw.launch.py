@@ -13,8 +13,8 @@ def generate_launch_description():
             executable="mpu9250",
             name="mpu9250",
             parameters=[{
-                "print": False,
-                "raw_only": True,    # only publish raw IMU data - /imu/data_raw and /imu/mag
+                "print": False,      # default False
+                "raw_only": True,    # default False ("fusing" mode). When True - only publish raw IMU data - /imu/data_raw and /imu/mag
                 "frequency": 30,
                 "temp_pub_rate_hz": 1.0,  # temperature publish rate in Hz
                 "frame_id": "imu_link",
