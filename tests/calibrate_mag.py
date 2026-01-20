@@ -1,6 +1,6 @@
 
 import time
-import smbus
+from smbus2 import SMBus
 
 from mpu9250.imusensor.MPU9250 import MPU9250
 
@@ -9,10 +9,14 @@ from mpu9250.imusensor.MPU9250 import MPU9250
 #
 
 address = 0x68
-bus = smbus.SMBus(1)
+bus = SMBus(1)
+
+print(f"IP: Initializing MPU9250 at address {hex(address)} on I2C bus 1")
 
 imu = MPU9250.MPU9250(bus, address)
 imu.begin()
+
+print("OK: IMU initialized")
 
 # imu.calibrateGyro()
 # imu.calibrateAccelerometer()
@@ -25,8 +29,9 @@ imu.begin()
 #imu.calibrateMagApprox()
 
 while True:
-	imu.readSensor()
-	imu.computeOrientation()
+    imu.readSensor()
+    imu.computeOrientation()
 
-	print ("roll: {0} ; pitch : {1} ; yaw : {2}".format(imu.roll, imu.pitch, imu.yaw))
-	time.sleep(0.2)
+    print(f"roll:{imu.roll:8.2f}     pitch:{imu.pitch:8.2f}     yaw:{imu.yaw:8.2f}")
+
+    time.sleep(0.2)
