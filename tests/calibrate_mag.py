@@ -54,9 +54,19 @@ def main():
     #imu.calibrateMagApprox()
     imu.calibrateMagPrecise()
 
-    print(f"MagBias: {imu.MagBias}")
-    print(f"Mags: {imu.Mags}")
-    print(f"Magtransform: {imu.Magtransform}")
+    print()
+    print()
+    print("\"magnetometer_scale\": [" + ", ".join(f"{x}" for x in imu.Mags) + "],  # should be around 1.0")
+    print("\"magnetometer_bias\": [" + ", ".join(f"{x}" for x in imu.MagBias) + "],")
+    if imu.Magtransform is not None:
+        print("\"magnetometer_transform\": [")
+        for i, row in enumerate(imu.Magtransform):
+            row_str = ", ".join(f"{x}" for x in row)
+            if i < len(imu.Magtransform) - 1:
+                print(f"    {row_str},")
+            else:
+                print(f"    {row_str}]")
+    print()
 
     read_orientation(imu, 10, "IP: Reading mag values and orientation after calibration")
 
