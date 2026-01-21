@@ -94,6 +94,22 @@ class MPU9250Node(Node):
         # Wraps the given angle(s) to +/- pi.
         return (angle + math.pi) % (2 * math.pi) - math.pi
 
+    def rotate_mag(self, mag_vals):
+        """
+        Rotate magnetometer reading to align with accel+gyro frame.
+        Inputs:
+            mag_values, a numpy.ndarray — a 1D array of 3 float64 values, magnetometer readings
+        Returns:
+            numpy.ndarray — a 1D array of 3 float64 values : rotated magnetometer readings
+        """
+        #   Accel/Gyro: X forward, Y left, Z up
+        #   Mag:        X right, Y forward, Z down
+        mx, my, mz = mag_vals
+        mxr =  my
+        myr = -mx
+        mzr = -mz
+        return np.array([mxr, myr, mzr])
+
     def publish_imu_values(self):
         self.imu.readSensor()
         now = self.get_clock().now()
@@ -101,6 +117,8 @@ class MPU9250Node(Node):
         deltaTime = max(1e-4, min(deltaTime, 0.2))  # clamp to reasonable range
         self.lastTime = now
         frame_id = self.get_parameter('frame_id').value
+
+        magVals_rotated = self.rotate_mag(self.imu.MagVals)
 
         if not self.raw_only:
             #self.imu.computeOrientation()
@@ -112,7 +130,7 @@ class MPU9250Node(Node):
             self.sensorfusion.computeAndUpdateRollPitchYaw(
                 self.imu.AccelVals[0], self.imu.AccelVals[1], self.imu.AccelVals[2],
                 self.imu.GyroVals[0], self.imu.GyroVals[1], self.imu.GyroVals[2],
-                self.imu.MagVals[0], self.imu.MagVals[1], self.imu.MagVals[2], deltaTime)
+                magVals_rotated[0], magVals_rotated[1], magVals_rotated[2], deltaTime)
 
             # RPY should be in the ENU (East-North-Up) reference frame, in degrees
             # sensor frame (REP-103 body: x forward, y left, z up), world frame (ENU)
@@ -167,9 +185,10 @@ class MPU9250Node(Node):
         msg_mag.header.frame_id = frame_id
         # mag covariance unknown for now - uncalibrated mag, no noise model
         msg_mag.magnetic_field_covariance[0] = -1.0
-        msg_mag.magnetic_field.x = self.imu.MagVals[0]  # Tesla
-        msg_mag.magnetic_field.y = self.imu.MagVals[1]
-        msg_mag.magnetic_field.z = self.imu.MagVals[2]
+
+        msg_mag.magnetic_field.x = magVals_rotated[0]  # Tesla
+        msg_mag.magnetic_field.y = magVals_rotated[1]
+        msg_mag.magnetic_field.z = magVals_rotated[2]
         self.publisher_mag_values_.publish(msg_mag)
 
         # Accumulate temp for averaging
