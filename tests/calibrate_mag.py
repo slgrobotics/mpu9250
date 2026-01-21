@@ -7,61 +7,61 @@ from mpu9250.imusensor.MPU9250 import MPU9250
 # see https://github.com/niru-5/imusensor/blob/master/README.md#basic-usage
 #
 
-address = 0x68
-bus = SMBus(1)
 
-print(f"IP: Initializing MPU9250 at address {hex(address)} on I2C bus 1")
+def read_orientation(imu, count, message=""):
+    """Read and print IMU orientation for specified number of iterations."""
+    if message:
+        print(message)
+    
+    for i in range(count):
+        imu.readSensor()
+        imu.computeOrientation()
 
-imu = MPU9250.MPU9250(bus, address)
-imu.begin()
+        MagVals_uT = imu.MagVals * 1e6  # convert to microTesla
 
-# Note: initial values for biases and scales in imu object:
-#		MagBias = np.array([0.0, 0.0, 0.0])
-#		Mags = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
-#       Magtransform = None  # magnetometer calibration is unknown. A 3x3 matrix, calculated in calibrateMagPrecise()
+        print(f"MagVals: x={MagVals_uT[0]:8.2f} y={MagVals_uT[1]:8.2f} z={MagVals_uT[2]:8.2f} uT    roll:{imu.roll:8.2f}     pitch:{imu.pitch:8.2f}     yaw:{imu.yaw:8.2f} degrees")
 
-print("OK: IMU initialized")
+        time.sleep(0.2)
 
-# imu.calibrateGyro()
-# imu.calibrateAccelerometer()
-# or load your own calibration file
-#imu.loadCalibDataFromFile("/home/pi/calib_real_bolder.json")
 
-# Note: Make sure you rotate the sensor in 8 shape and cover all the pitch and roll angles.
+def main():
+    address = 0x68
+    bus = SMBus(1)
 
-#imu.calibrateMagPrecise()
+    print(f"IP: Initializing MPU9250 at address {hex(address)} on I2C bus 1")
 
-print("IP: Reading initial mag values and orientation")
+    imu = MPU9250.MPU9250(bus, address)
+    imu.begin()
 
-count = 0
-while count < 5:
-    imu.readSensor()
-    imu.computeOrientation()
+    # Note: initial values for biases and scales in imu object:
+    #		MagBias = np.array([0.0, 0.0, 0.0])
+    #		Mags = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
+    #       Magtransform = None  # magnetometer calibration is unknown. A 3x3 matrix, calculated in calibrateMagPrecise()
 
-    print(f"MagVals: {imu.MagVals}     roll:{imu.roll:8.2f}     pitch:{imu.pitch:8.2f}     yaw:{imu.yaw:8.2f}")
+    print("OK: IMU initialized")
 
-    time.sleep(0.2)
-    count += 1
+    # imu.calibrateGyro()
+    # imu.calibrateAccelerometer()
+    # or load your own calibration file
+    #imu.loadCalibDataFromFile("/home/pi/calib_real_bolder.json")
 
-print("calibrating - rotate the sensor in 8 shape and cover all the pitch and roll angles")
+    # Note: Make sure you rotate the sensor in 8 shape and cover all the pitch and roll angles.
 
-#imu.calibrateMagApprox()
-imu.calibrateMagPrecise()
+    read_orientation(imu, 5, "IP: Reading initial mag values and orientation")
 
-print(f"MagBias: {imu.MagBias}")
-print(f"Mags: {imu.Mags}")
-print(f"Magtransform: {imu.Magtransform}")
+    print("calibrating - rotate the sensor in 8 shape and cover all the pitch and roll angles")
 
-print("IP: Reading mag values and orientation after calibration")
+    #imu.calibrateMagApprox()
+    imu.calibrateMagPrecise()
 
-count = 0
-while count < 10:
-    imu.readSensor()
-    imu.computeOrientation()
+    print(f"MagBias: {imu.MagBias}")
+    print(f"Mags: {imu.Mags}")
+    print(f"Magtransform: {imu.Magtransform}")
 
-    print(f"MagVals: {imu.MagVals}     roll:{imu.roll:8.2f}     pitch:{imu.pitch:8.2f}     yaw:{imu.yaw:8.2f}")
+    read_orientation(imu, 10, "IP: Reading mag values and orientation after calibration")
 
-    time.sleep(0.2)
-    count += 1
+    print("Done")
 
-print("Done")
+
+if __name__ == "__main__":
+    main()

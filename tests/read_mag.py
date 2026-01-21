@@ -40,7 +40,9 @@ while True:
     imu.readSensor()
     imu.computeOrientation()
 
-    print(f"MagVals: {imu.MagVals}     roll:{imu.roll:8.2f}     pitch:{imu.pitch:8.2f}     yaw:{imu.yaw:8.2f}")
+    MagVals_uT = imu.MagVals * 1e6  # convert to microTesla
+
+    print(f"MagVals: x={MagVals_uT[0]:8.2f} y={MagVals_uT[1]:8.2f} z={MagVals_uT[2]:8.2f} uT    roll:{imu.roll:8.2f}     pitch:{imu.pitch:8.2f}     yaw:{imu.yaw:8.2f} degrees")
 
     time.sleep(0.2)
 
