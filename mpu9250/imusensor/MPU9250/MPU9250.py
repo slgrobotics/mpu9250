@@ -503,8 +503,8 @@ class MPU9250:
 			self.readSensor()
 			magvals[sample] = self.MagVals/self.Mags + self.MagBias
 			time.sleep(0.02)
-			if sample % 100 == 0:
-				print(f"Calibration progress: {sample}/{numSamples} samples")
+			if sample % 10 == 0:
+				print(f"Calibration progress: {sample}/{numSamples} samples", end='\r', flush=True)
 		minvals = np.array([magvals[:,0].min(), magvals[:,1].min(), magvals[:,2].min()])
 		maxvals = np.array([magvals[:,0].max(), magvals[:,1].max(), magvals[:,2].max()])
 
@@ -533,8 +533,8 @@ class MPU9250:
 			self.readSensor()
 			magvals[sample] = self.MagVals/self.Mags + self.MagBias
 			time.sleep(0.05)
-			if sample % 100 == 0:
-				print(f"Calibration progress: {sample}/{numSamples} samples")
+			if sample % 10 == 0:
+				print(f"Calibration progress: {sample}/{numSamples} samples", end='\r', flush=True)
 		centre, evecs, radii, v = self.__ellipsoid_fit(magvals)
 
 		a, b, c = radii
