@@ -34,7 +34,7 @@ def main():
 
     print(f"IP: Initializing MPU9250 at address {hex(address)} on I2C bus 1")
 
-    imu = MPU9250.MPU9250(bus, address)
+    imu = MPU9250(bus, address)
     imu.begin()
 
     # Note: initial values for biases and scales in imu object:

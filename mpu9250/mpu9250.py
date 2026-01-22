@@ -44,7 +44,7 @@ class MPU9250Node(Node):
 
         address = self.get_parameter('i2c_address').value
         bus = smbus.SMBus(self.get_parameter('i2c_port').value)
-        self.imu = MPU9250.MPU9250(bus, address)
+        self.imu = MPU9250(bus, address)
         self.raw_only = self.get_parameter('raw_only').value
 
         self.imu.Accels = np.asarray(self.get_parameter('acceleration_scale').value)
