@@ -44,24 +44,40 @@ class MPU9250Node(Node):
 
         address = self.get_parameter('i2c_address').value
         bus = smbus.SMBus(self.get_parameter('i2c_port').value)
+
+        self.logger.info(f"   i2c_addr: 0x{address:X} on bus {bus.fd}")
+
         self.imu = MPU9250(bus, address)
-        self.raw_only = self.get_parameter('raw_only').value
 
-        self.imu.Accels = np.asarray(self.get_parameter('acceleration_scale').value)
-        self.imu.AccelBias = np.asarray(self.get_parameter('acceleration_bias').value)
-        self.imu.GyroBias = np.asarray(self.get_parameter('gyro_bias').value)
-        self.imu.Mags = np.asarray(self.get_parameter('magnetometer_scale').value)
-        self.imu.MagBias = np.asarray(self.get_parameter('magnetometer_bias').value)
-        self.imu.Magtransform = np.reshape(np.asarray(self.get_parameter('magnetometer_transform').value),(3,3))
+        self.print = self.get_parameter('print').get_parameter_value().bool_value
+        self.logger.info(f"   print: {self.print}")
 
-        pub_rate_hz = self.get_parameter('frequency').value
+        self.frame_id = self.get_parameter("frame_id").get_parameter_value().string_value
+        self.logger.info(f"   frame_id: {self.frame_id}")
+
+        self.raw_only = self.get_parameter('raw_only').get_parameter_value().bool_value
+        self.logger.info(f"   raw_only: {self.raw_only}")
+
+        self.pub_rate_hz = self.get_parameter("frequency").get_parameter_value().integer_value
+        self.logger.info(f"   pub_rate_hz: {self.pub_rate_hz} Hz")
+        
+        temp_pub_rate_hz = float(self.get_parameter("temp_pub_rate_hz").value)
+        self.logger.info(f"   temp_pub_rate_hz: {temp_pub_rate_hz} Hz")
+
+        self.imu.Accels = np.asarray(self.get_parameter('acceleration_scale').get_parameter_value().double_array_value)
+        self.imu.AccelBias = np.asarray(self.get_parameter('acceleration_bias').get_parameter_value().double_array_value)
+        self.imu.GyroBias = np.asarray(self.get_parameter('gyro_bias').get_parameter_value().double_array_value)
+        self.imu.Mags = np.asarray(self.get_parameter('magnetometer_scale').get_parameter_value().double_array_value)
+        self.imu.MagBias = np.asarray(self.get_parameter('magnetometer_bias').get_parameter_value().double_array_value)
+        self.imu.Magtransform = np.reshape(np.asarray(self.get_parameter('magnetometer_transform').get_parameter_value().double_array_value),(3,3))
+
+        pub_rate_hz = self.get_parameter('frequency').get_parameter_value().integer_value
         self.timer_publish_imu_values_ = self.create_timer(1.0/pub_rate_hz, self.publish_imu_values)
 
         self.publisher_imu_values_ = self.create_publisher(Imu, "/imu/data_raw" if self.raw_only else "/imu/data", 10)  # raw or fused IMU values
         
         self.publisher_mag_values_ = self.create_publisher(MagneticField, "/imu/mag", 10)  # raw magnetometer values
 
-        temp_pub_rate_hz = float(self.get_parameter("temp_pub_rate_hz").value)
         self.publisher_temperature = self.create_publisher(Temperature, "/imu/temp", 10)
 
         # Temperature averaging (accumulate at IMU rate, publish averaged at ~temp_pub_rate_hz)
@@ -106,7 +122,7 @@ class MPU9250Node(Node):
         #   Mag:        X right, Y forward, Z down
         mx, my, mz = mag_vals
         mxr =  my
-        myr = -mx
+        myr =  mx
         mzr = -mz
         return np.array([mxr, myr, mzr])
 
@@ -116,7 +132,7 @@ class MPU9250Node(Node):
         deltaTime = (now - self.lastTime).nanoseconds * 1e-9  # seconds (float)
         deltaTime = max(1e-4, min(deltaTime, 0.2))  # clamp to reasonable range
         self.lastTime = now
-        frame_id = self.get_parameter('frame_id').value
+        frame_id = self.frame_id
 
         magVals_rotated = self.rotate_mag(self.imu.MagVals)
 
@@ -208,11 +224,25 @@ class MPU9250Node(Node):
             self._temp_sum_c = 0.0
             self._temp_count = 0
 
-        # print only when fusion is enabled, and not too often:
-        if not self.raw_only and self.get_parameter('print').value and publish_temp_now:
-            #print("roll: {:8.2f} \tpitch : {:8.2f} \tyaw : {:8.2f}".format(self.sensorfusion.roll, self.sensorfusion.pitch, self.sensorfusion.yaw))
-            #print("roll: {:8.2f} \tpitch : {:8.2f} \tyaw : {:8.2f}".format(roll, pitch, yaw_r))
-            print(f"yaw : {math.degrees(yaw_r):8.2f}")
+        # print not too often:
+        if self.print and publish_temp_now:
+            MagVals_uT = magVals_rotated * 1e6  # convert to microTesla
+
+            self.logger.info(f"MagVals:   x={MagVals_uT[0]:8.2f} y={MagVals_uT[1]:8.2f} z={MagVals_uT[2]:8.2f} micro Tesla")
+
+            AccelVals = self.imu.AccelVals
+            self.logger.info(f"AccelVals: x={AccelVals[0]:8.4f} y={AccelVals[1]:8.4f} z={AccelVals[2]:8.4f} m/s²")
+
+            GyroVals = self.imu.GyroVals
+            self.logger.info(f"GyroVals:  x={GyroVals[0]:8.4f} y={GyroVals[1]:8.4f} z={GyroVals[2]:8.4f} rad/s")
+
+            # print only when fusion is enabled, and orientation is valid:
+            if (not self.raw_only) and self._orientation_valid:
+                #roll, pitch, yaw = self.filter.quaternion_rpy()      # ENU frame, yaw=0 East
+                roll, pitch, yaw = self.filter.quaternion_rpy_nav()  # Navigation frame, yaw=0 North
+                self.logger.info(
+                    f"Orientation: roll={math.degrees(roll):.2f}, pitch={math.degrees(pitch):.2f}, yaw={math.degrees(yaw):.2f} degrees North"
+                )
 
 def main(args=None):
     rclpy.init(args=args)
