@@ -1,6 +1,10 @@
 import time
 from smbus2 import SMBus
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 from mpu9250.imusensor.MPU9250 import MPU9250
 
 #
