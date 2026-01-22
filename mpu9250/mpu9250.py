@@ -119,7 +119,7 @@ class MPU9250Node(Node):
             numpy.ndarray — a 1D array of 3 float64 values : rotated magnetometer readings
         """
         #   Accel/Gyro: X forward, Y left, Z up
-        #   Mag:        X right, Y forward, Z down
+        #   Mag:        X left, Y forward, Z down
         mx, my, mz = mag_vals
         mxr =  my
         myr =  mx
