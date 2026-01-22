@@ -8,7 +8,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from mpu9250.imusensor.MPU9250 import MPU9250
 
-
 #
 # see https://github.com/niru-5/imusensor/blob/master/README.md#basic-usage
 #
@@ -28,12 +27,13 @@ imu.begin()
 
 print("OK: IMU initialized")
 
-
+"""
 imu.MagBias = np.array([3.14156455e-05, 6.44644552e-06, 2.43798173e-05])
 imu.Mags = np.array([1., 1., 1.])
 imu.Magtransform = np.array([[ 1.05464768, -0.03982411, -0.01269338],
                             [-0.03982411,  0.93736574, -0.01455147],
                             [-0.01269338, -0.01455147,  1.01356064]])
+"""
 
 print(f"MagBias: {imu.MagBias}")
 print(f"Mags: {imu.Mags}")
@@ -47,7 +47,13 @@ while True:
 
     MagVals_uT = imu.MagVals * 1e6  # convert to microTesla
 
-    print(f"MagVals: x={MagVals_uT[0]:8.2f} y={MagVals_uT[1]:8.2f} z={MagVals_uT[2]:8.2f} uT    roll:{imu.roll:8.2f}     pitch:{imu.pitch:8.2f}     yaw:{imu.yaw:8.2f} degrees")
+    print(f"MagVals:   x={MagVals_uT[0]:8.2f} y={MagVals_uT[1]:8.2f} z={MagVals_uT[2]:8.2f} uT    roll:{imu.roll:8.2f}     pitch:{imu.pitch:8.2f}     yaw:{imu.yaw:8.2f} degrees")
+
+    AccelVals = imu.AccelVals
+    print(f"AccelVals: x={AccelVals[0]:8.4f} y={AccelVals[1]:8.4f} z={AccelVals[2]:8.4f} m/s²")
+    
+    GyroVals = imu.GyroVals
+    print(f"GyroVals:  x={GyroVals[0]:8.4f} y={GyroVals[1]:8.4f} z={GyroVals[2]:8.4f} rad/s")
 
     time.sleep(0.2)
 
