@@ -219,12 +219,8 @@ class MPU9250Node(Node):
             self.logger.info(f"GyroVals:  x={GyroVals[0]:8.4f} y={GyroVals[1]:8.4f} z={GyroVals[2]:8.4f} rad/s")
 
             # print only when fusion is enabled, and orientation is valid:
-            if (not self.raw_only) and self._orientation_valid:
-                #roll, pitch, yaw = self.filter.quaternion_rpy()      # ENU frame, yaw=0 East
-                roll, pitch, yaw = self.filter.quaternion_rpy_nav()  # Navigation frame, yaw=0 North
-                self.logger.info(
-                    f"Orientation: roll={math.degrees(roll):.2f}, pitch={math.degrees(pitch):.2f}, yaw={math.degrees(yaw):.2f} degrees North"
-                )
+            if not self.raw_only:
+                self.logger.info(f"Orientation: roll={roll:.2f}, pitch={pitch:.2f}, yaw={yaw:.2f} degrees North")
 
 def main(args=None):
     rclpy.init(args=args)
