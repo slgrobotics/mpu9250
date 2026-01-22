@@ -158,7 +158,7 @@ class MPU9250:
 		self.Bus = bus
 		self.AccelBias = np.array([0.0, 0.0, 0.0])
 		self.Accels = np.array([1.0, 1.0, 1.0])
-		self.MagBias = np.array([0.0, 0.0, 0.0])
+		self.MagBias = np.array([0.0, 0.0, 0.0])   # magnetometer bias derived during calibration
 		self.Mags = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
 		self.GyroBias = np.array([0.0, 0.0, 0.0])  # will be set in begin() after short gyro calibration
 		self.Magtransform = None  # magnetometer calibration is unknown
@@ -335,6 +335,22 @@ class MPU9250:
 			return -1
 		return 1
 
+	def rotate_mag(self, mag_vals):
+		"""
+		Rotate magnetometer reading to align with accel+gyro frame.
+		Inputs:
+			mag_values, a numpy.ndarray — a 1D array of 3 float64 values, magnetometer readings
+		Returns:
+			numpy.ndarray — a 1D array of 3 float64 values : rotated magnetometer readings
+		"""
+		#   Accel/Gyro: X forward, Y left, Z up
+		#   Mag:        X left, Y forward, Z down
+		mx, my, mz = mag_vals
+		mxr =  my
+		myr =  mx
+		mzr = -mz
+		return np.array([mxr, myr, mzr])
+
 	def readSensor(self):
 		"""Read accel/gyro/mag + apply calibration + optional transforms."""
 
@@ -356,12 +372,13 @@ class MPU9250:
 		magvals = mag_u16.view(np.int16)
 
 		m_raw = magvals[-3:]
+		m_raw_r = self.rotate_mag(m_raw)  # rotate to align with accel/gyro frame
 
 		# ---- Calibrate in sensor frame (scale then bias) ----
 		# Assumption: Bias arrays are in scaled units (same units as raw*scale)
 		a_cal = (a_raw.astype(np.float64) * self.AccelScale - self.AccelBias) * self.Accels
 		g_cal = (g_raw.astype(np.float64) * self.GyroScale - self.GyroBias)  # GyroBias is calibrated in begin()
-		m_cal = (m_raw.astype(np.float64) * self.MagScale  - self.MagBias)   * self.Mags  # converted to Tesla and adjusted
+		m_cal = (m_raw_r.astype(np.float64) * self.MagScale  - self.MagBias)   * self.Mags  # converted to Tesla and adjusted
 
         # ---- Apply hardcoded axis transform to accel/gyro ----
 		T = self.cfg.transformationMatrixAG    # expected shape (3,3)
@@ -509,6 +526,7 @@ class MPU9250:
 		maxvals = np.array([magvals[:,0].max(), magvals[:,1].max(), magvals[:,2].max()])
 
 		self.MagBias = (minvals + maxvals)/2.0
+		self.MagBias[2] = -self.MagBias[2]  # change in z bias
 		averageRad = (((maxvals - minvals)/2.0).sum())/3.0
 		self.Mags = ((maxvals - minvals)/2.0)*(1/averageRad)
 
@@ -543,6 +561,7 @@ class MPU9250:
 		transformation = evecs.dot(D).dot(evecs.T)
 
 		self.MagBias = centre
+		self.MagBias[2] = -self.MagBias[2]  # change in z bias
 		self.Magtransform = transformation
 
 		self.setSRD(currentSRD)
