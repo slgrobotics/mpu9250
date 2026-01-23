@@ -37,6 +37,8 @@ class MPU9250Node(Node):
                     1.0, 0.0, 0.0,
                     0.0, 1.0, 0.0,
                     0.0, 0.0, 1.0]),
+                ("madgwick_beta", 0.05),   # 0.04-0.2 typical, 0.01 for faster settling after rotation
+                ("madgwick_use_mag", True)
             ]
         )
 
@@ -74,7 +76,7 @@ class MPU9250Node(Node):
         pub_rate_hz = self.get_parameter('frequency').get_parameter_value().integer_value
         self.timer_publish_imu_values_ = self.create_timer(1.0/pub_rate_hz, self.publish_imu_values)
 
-        self.publisher_imu_values_ = self.create_publisher(Imu, "/imu/data_raw" if self.raw_only else "/imu/data", 10)  # raw or fused IMU values
+        self.publisher_imu_raw_values_ = self.create_publisher(Imu, "/imu/data_raw", 10)  # raw or fused IMU values
         
         self.publisher_mag_values_ = self.create_publisher(MagneticField, "/imu/mag", 10)  # raw magnetometer values
 
@@ -92,15 +94,28 @@ class MPU9250Node(Node):
         self.logger.info(f"Magnetometer Sensitivity Scales: {self.imu.MagScale}  LSB/Tesla")
         self.logger.info(f"Gyro Bias: {self.imu.GyroBias}  rad/s")
 
-        if not self.raw_only:
+        if self.raw_only:
+            self.logger.info("   IMU node configured for raw data only; no orientation filter will be used.")
+        else:
+            self.logger.info("   IMU node configured to provide fused orientation data; Madgwick filter used.")
+            # Madgwick params
+            self.madgwick_beta = float(self.get_parameter("madgwick_beta").value)
+            self.madgwick_use_mag = self.get_parameter("madgwick_use_mag").get_parameter_value().bool_value
+
+            self.logger.info(f"   madgwick_beta: {self.madgwick_beta}")
+            self.logger.info(f"   madgwick_use_mag: {self.madgwick_use_mag}")
+
+            # Fused data publisher (with orientation):
+            self.publisher_imu_values_ = self.create_publisher(Imu, "/imu/data", 10)
+
             # Initialize sensor fusion algorithm:
-            self.sensorfusion = kalman.Kalman()
-            #self.sensorfusion = madgwick.Madgwick(0.5)
+            #self.sensorfusion = kalman.Kalman()
+            self.sensorfusion = madgwick.Madgwick(self.madgwick_beta)  # usually beta around 0.1
 
             # Initial read to set roll/pitch/yaw:
             self.imu.readSensor()    
             self.imu.computeOrientation()
-            self.sensorfusion.roll = self.imu.roll
+            self.sensorfusion.roll = self.imu.roll    # degrees
             self.sensorfusion.pitch = self.imu.pitch
             self.sensorfusion.yaw = self.imu.yaw
 
@@ -118,43 +133,48 @@ class MPU9250Node(Node):
         self.lastTime = now
         frame_id = self.frame_id
 
+        msg_imu_raw = Imu()
+        msg_imu_raw.header.stamp = now.to_msg()
+        msg_imu_raw.header.frame_id = frame_id
+
+        # Raw measurements, unknown covariance
+        msg_imu_raw.linear_acceleration.x = self.imu.AccelVals[0]  # m/s^2
+        msg_imu_raw.linear_acceleration.y = self.imu.AccelVals[1]
+        msg_imu_raw.linear_acceleration.z = self.imu.AccelVals[2]
+        msg_imu_raw.linear_acceleration_covariance[0] = -1.0
+
+        msg_imu_raw.angular_velocity.x = self.imu.GyroVals[0]  # rad/s
+        msg_imu_raw.angular_velocity.y = self.imu.GyroVals[1]
+        msg_imu_raw.angular_velocity.z = self.imu.GyroVals[2]
+        msg_imu_raw.angular_velocity_covariance[0] = -1.0
+
+        # No orientation in raw data
+        msg_imu_raw.orientation_covariance[0] = -1.0
+
+        self.publisher_imu_values_.publish(msg_imu_raw)
+
         if not self.raw_only:
             #self.imu.computeOrientation()
             #yaw = self.imu.yaw
             #pitch = self.imu.pitch
             #roll = self.imu.roll
-            #computeAndUpdateRollPitchYaw
 
             self.sensorfusion.computeAndUpdateRollPitchYaw(
                 self.imu.AccelVals[0], self.imu.AccelVals[1], self.imu.AccelVals[2],
                 self.imu.GyroVals[0], self.imu.GyroVals[1], self.imu.GyroVals[2],
-                self.imu.MagVals[0], self.imu.MagVals[1], self.imu.MagVals[2], deltaTime)
+                self.imu.MagVals[1], -self.imu.MagVals[0], -self.imu.MagVals[2], # rotated mag values to align with accel/gyro frame
+                deltaTime)
 
-            # RPY should be in the ENU (East-North-Up) reference frame, in degrees
+            # RPY should be in the ENU (East-North-Up) reference frame
             # sensor frame (REP-103 body: x forward, y left, z up), world frame (ENU)
-            roll = self.sensorfusion.roll
+            roll = self.sensorfusion.roll    # degrees
             pitch = self.sensorfusion.pitch
             yaw = self.sensorfusion.yaw
 
-        msg_imu = Imu()
-        msg_imu.header.stamp = now.to_msg()
-        msg_imu.header.frame_id = frame_id
+            msg_imu = Imu()
+            msg_imu.header.stamp = now.to_msg()
+            msg_imu.header.frame_id = frame_id
 
-        if self.raw_only:
-            # Raw measurements, unknown covariance
-            msg_imu.linear_acceleration.x = self.imu.AccelVals[0]  # m/s^2
-            msg_imu.linear_acceleration.y = self.imu.AccelVals[1]
-            msg_imu.linear_acceleration.z = self.imu.AccelVals[2]
-            msg_imu.linear_acceleration_covariance[0] = -1.0
-
-            msg_imu.angular_velocity.x = self.imu.GyroVals[0]  # rad/s
-            msg_imu.angular_velocity.y = self.imu.GyroVals[1]
-            msg_imu.angular_velocity.z = self.imu.GyroVals[2]
-            msg_imu.angular_velocity_covariance[0] = -1.0
-
-            # No orientation in raw data
-            msg_imu.orientation_covariance[0] = -1.0
-        else:
             # Fused measurements with covariance
             msg_imu.linear_acceleration.x = self.imu.AccelVals[0]  # m/s^2
             msg_imu.linear_acceleration.y = self.imu.AccelVals[1]
@@ -168,15 +188,18 @@ class MPU9250Node(Node):
 
             # Calculate euler angles, convert to quaternion and store in message
             # Convert to quaternion
-            yaw_r = self.wrap_pi(radians(yaw))
-            quat = tf_transformations.quaternion_from_euler(radians(roll), radians(pitch), yaw_r)
+            #yaw_r = self.wrap_pi(radians(yaw))
+            #quat = tf_transformations.quaternion_from_euler(radians(roll), radians(pitch), yaw_r)
+
+            quat = self.sensorfusion.q  # use quaternion directly from sensor fusion
+
             msg_imu.orientation.x = quat[0]
             msg_imu.orientation.y = quat[1]
             msg_imu.orientation.z = quat[2]
             msg_imu.orientation.w = quat[3]
             msg_imu.orientation_covariance = [0.05, 0.0, 0.0, 0.0, 0.05, 0.0, 0.0, 0.0, 0.10]
 
-        self.publisher_imu_values_.publish(msg_imu)
+            self.publisher_imu_values_.publish(msg_imu)
 
         msg_mag = MagneticField()
         msg_mag.header.stamp = now.to_msg()

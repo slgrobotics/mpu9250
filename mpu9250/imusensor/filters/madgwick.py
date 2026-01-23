@@ -36,6 +36,8 @@ class Madgwick:
 		---------
 		q: array containing quaternion vals
 
+		fills the class properties roll, pitch and yaw in degrees
+
 		"""
 
 		self.yaw = np.degrees(np.arctan2(2*q[1]*q[2] + 2*q[0]*q[3],\
@@ -168,7 +170,7 @@ class Madgwick:
 						[2*(q[1]*q[3] - q[0]*q[2]), 2*(q[2]*q[3] + q[0]*q[1]), 2*q[0]*q[0] -1 +2*q[3]*q[3]]])
 		return rotMat
 
-	def updateRollPitchYaw(self, ax, ay, az, gx, gy, gz, mx, my, mz, dt):
+	def computeAndUpdateRollPitchYaw(self, ax, ay, az, gx, gy, gz, mx, my, mz, dt):
 		"""
 		Computes roll, pitch and yaw
 
