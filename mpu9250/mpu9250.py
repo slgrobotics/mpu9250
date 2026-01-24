@@ -98,6 +98,7 @@ class MPU9250Node(Node):
 
         self._mag_msg = MagneticField()
         self._mag_msg.header.frame_id = self.frame_id
+        # mag covariance unknown for now - uncalibrated mag, no noise model
         self._mag_msg.magnetic_field_covariance[0] = -1.0
 
         self._temp_msg = Temperature()
@@ -290,9 +291,6 @@ class MPU9250Node(Node):
             self._imu_msg.angular_velocity.z = (self.imu.GyroVals[2])
 
             self.imu_pub.publish(self._imu_msg)
-
-        # mag covariance unknown for now - uncalibrated mag, no noise model
-        self._mag_msg.magnetic_field_covariance[0] = -1.0
 
         self._mag_msg.magnetic_field.x = self.imu.MagVals[0]  # Tesla
         self._mag_msg.magnetic_field.y = self.imu.MagVals[1]
