@@ -3,7 +3,6 @@ import math
 import numpy as np
 
 from .imusensor.MPU9250 import MPU9250
-from .imusensor.filters import kalman 
 from .imusensor.filters import madgwick
 
 import rclpy
@@ -11,17 +10,13 @@ from rclpy.node import Node
 
 from sensor_msgs.msg import Imu, MagneticField, Temperature
 
-from math import radians
-import tf_transformations
-
-
 class MPU9250Node(Node):
     def __init__(self):
         super().__init__("mpu9250_node")
         self.declare_parameters(
             namespace='',
             parameters=[
-                ('print', False),
+                ('verbose', False),
                 ('raw_only', False),
                 ('frequency', 30),
                 ('temp_pub_rate_hz', 1.0),
@@ -45,14 +40,15 @@ class MPU9250Node(Node):
         self.logger = self.get_logger()
 
         address = self.get_parameter('i2c_address').value
-        bus = smbus.SMBus(self.get_parameter('i2c_port').value)
+        port = self.get_parameter('i2c_port').value
+        bus = smbus.SMBus(port)
 
-        self.logger.info(f"   i2c_addr: 0x{address:X} on bus {bus.fd}")
+        self.logger.info(f"   i2c_addr: 0x{address:X} on I2C bus {port}")
 
         self.imu = MPU9250(bus, address)
 
-        self.print = self.get_parameter('print').get_parameter_value().bool_value
-        self.logger.info(f"   print: {self.print}")
+        self.verbose = self.get_parameter('verbose').get_parameter_value().bool_value
+        self.logger.info(f"   verbose: {self.verbose}")
 
         self.frame_id = self.get_parameter("frame_id").get_parameter_value().string_value
         self.logger.info(f"   frame_id: {self.frame_id}")
@@ -106,7 +102,7 @@ class MPU9250Node(Node):
 
         self._temp_msg = Temperature()
         self._temp_msg.header.frame_id = self.frame_id
-        self._temp_msg.variance = 0.25  # (0.5C)^2
+        self._temp_msg.variance = 0.25 # +- 0.5 degrees C squared
 
         self._imu_msg = None
 
@@ -194,10 +190,6 @@ class MPU9250Node(Node):
 
         self.logger.info("OK: MPU9250 Node: init successful")
 
-    def wrap_pi(self, angle):
-        # Wraps the given angle(s) to +/- pi.
-        return (angle + math.pi) % (2 * math.pi) - math.pi
-
     def publish_imu_values(self):
         """
         Publishes:
@@ -230,17 +222,12 @@ class MPU9250Node(Node):
             self._imu_msg.header.stamp = stamp
 
         # --- dt for filter ---
-        dt = None
-        if not self.raw_only:
-            if self._last_stamp is None:
+        dt = 1.0 / float(self.pub_rate_hz)
+        if self._last_stamp is not None:
+            dt = (now - self._last_stamp).nanoseconds * 1e-9
+            if not (0.0 < dt <= 0.2):
                 dt = 1.0 / float(self.pub_rate_hz)
-            else:
-                dt = (now - self._last_stamp).nanoseconds * 1e-9
-                if dt <= 0.0:
-                    dt = 1.0 / float(self.pub_rate_hz)
-                elif dt > 0.2:
-                    dt = 0.2
-            self._last_stamp = now
+        self._last_stamp = now
 
         # Raw measurements, unknown covariance
         self._imu_raw_msg.linear_acceleration.x = self.imu.AccelVals[0]  # m/s^2
@@ -299,12 +286,10 @@ class MPU9250Node(Node):
             self._imu_msg.linear_acceleration.x = self.imu.AccelVals[0]  # m/s^2
             self._imu_msg.linear_acceleration.y = self.imu.AccelVals[1]
             self._imu_msg.linear_acceleration.z = self.imu.AccelVals[2]
-            self._imu_msg.linear_acceleration_covariance = [0.10, 0.0, 0.0, 0.0, 0.10, 0.0, 0.0, 0.0, 0.10]
 
             self._imu_msg.angular_velocity.x = (self.imu.GyroVals[0])  # rad/s
             self._imu_msg.angular_velocity.y = (self.imu.GyroVals[1])
             self._imu_msg.angular_velocity.z = (self.imu.GyroVals[2])
-            self._imu_msg.angular_velocity_covariance = [0.02, 0.0, 0.0, 0.0, 0.02, 0.0, 0.0, 0.0, 0.02]
 
             self.imu_pub.publish(self._imu_msg)
 
@@ -325,14 +310,13 @@ class MPU9250Node(Node):
             avg_temp_c = self._temp_sum_c / float(self._temp_count)
             self._temp_msg.header.stamp = stamp
             self._temp_msg.temperature = round(avg_temp_c, 2)  # Celsius
-            self._temp_msg.variance = 0.25 # +- 0.5 degrees C squared
             self.temp_pub.publish(self._temp_msg)
             # Reset accumulator for next window
             self._temp_sum_c = 0.0
             self._temp_count = 0
 
         # print not too often:
-        if self.print and publish_temp_now:
+        if self.verbose and publish_temp_now:
             MagVals_uT = self.imu.MagVals * 1e6  # convert to microTesla
 
             self.logger.info(f"MagVals:   x={MagVals_uT[0]:8.2f} y={MagVals_uT[1]:8.2f} z={MagVals_uT[2]:8.2f} micro Tesla")

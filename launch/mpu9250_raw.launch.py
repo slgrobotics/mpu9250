@@ -19,7 +19,7 @@ def generate_launch_description():
             respawn_delay=4,
             emulate_tty=True,
             parameters=[{
-                "print": True,       # default False
+                "verbose": True,       # default False
                 "raw_only": True,    # default False ("fusing" mode). When True - only publish raw IMU data - /imu/data_raw and /imu/mag
                 "frequency": 30,
                 "temp_pub_rate_hz": 1.0,  # temperature publish rate in Hz
