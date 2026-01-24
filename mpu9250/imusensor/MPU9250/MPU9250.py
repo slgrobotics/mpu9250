@@ -193,9 +193,11 @@ class MPU9250:
 
 		self.setLowPassFilterFrequency("AccelLowPassFilter184")
 
+		# with DLPF enabled, the gyro output rate is 1 kHz
+
 		self.__writeRegister(self.cfg.SMPDivider, 0x00)
 		self.CurrentSRD = 0x00
-		# self.setSRD(0x00)
+		self.setSRD(self.CurrentSRD) # set Acc rate also to 1 kHz, 100 Hz for Mag
 
 		self.__writeRegister(self.cfg.UserControl, self.cfg.I2CMasterEnable)
 		self.__writeRegister(self.cfg.I2CMasterControl, self.cfg.I2CMasterClock)
@@ -206,7 +208,7 @@ class MPU9250:
 
 		self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963FuseROM)
 		time.sleep(0.1)
-		self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963ContinuosMeasurment2)
+		self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963ContinuosMeasurment2)  # 100 Hz mag rate
 		time.sleep(0.1)
 
 		# Accessing the mag's Factory Calibration (Fuse ROM):
@@ -219,7 +221,7 @@ class MPU9250:
 
 		self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963PowerDown)
 		time.sleep(0.1)
-		self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963ContinuosMeasurment2)
+		self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963ContinuosMeasurment2)  # 100 Hz
 		time.sleep(0.1)
 
 		self.__writeRegister(self.cfg.PowerManagement1, self.cfg.ClockPLL)
@@ -231,32 +233,47 @@ class MPU9250:
 		return 1
 
 	def setSRD(self, data):
-		"""Sets the frequency of getting data
+		"""
+		Sets the frequency of getting data from Accelerometer, matches it for magnetometer
 
 		Parameters
 		----------
 		data : int
-			This number is between 1 to 19 and decides the rate of sample collection
+			This number is between 1 to 19 and decides the Acc rate of sample collection relative to Gyro rate:
 
+		AccOutputRate = GyroOutputRate / (1 + data)
+
+		with DLPF enabled, the gyro output rate is 1 kHz
+
+		Acc/ Gyro "Sample Rate Divider":
+		Desired internal rate	SMPLRT_DIV (With DLPF enabled)
+		    1 kHz	0
+		  250 Hz	3
+		  200 Hz	4
+		  100 Hz	9
+		   50 Hz	19
 		"""
 
-		self.CurrentSRD = data
-		self.__writeRegister(self.cfg.SMPDivider, 19)
+		# temporary "slow mode" switch while reconfiguring the AK8963 rate
+		self.__writeRegister(self.cfg.SMPDivider, 19)  # forces ~50 Hz temporarily (with DLPF)
 
 		if data > 9:
+			# for lower Acc/Gyro rate, set mag to 8 Hz:
 			self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963PowerDown)
 			time.sleep(0.1)
-			self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963ContinuosMeasurment1)
+			self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963ContinuosMeasurment1)  # 8 Hz Mag rate
 			time.sleep(0.1)
 			self.__readAK8963Registers(self.cfg.Ak8963HXL, 7)
 		else:
+			# for higher Acc/Gyro rate, set mag to 100 Hz:
 			self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963PowerDown)
 			time.sleep(0.1)
-			self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963ContinuosMeasurment2)
+			self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963ContinuosMeasurment2)  # 100 Hz Mag rate
 			time.sleep(0.1)
 			self.__readAK8963Registers(self.cfg.Ak8963HXL, 7)
 
-		self.__writeRegister(self.cfg.SMPDivider, data)
+		self.CurrentSRD = data
+		self.__writeRegister(self.cfg.SMPDivider, data)  # set the desired Acc rate
 
 	def setAccelRange(self, accelRange):
 		"""Sets the range of accelerometer
@@ -276,8 +293,8 @@ class MPU9250:
 			self.__writeRegister(self.cfg.AccelConfig, self.cfg[accelRange])
 			self.AccelRange = accelRange
 		except:
-			print ("{0} is not a proper value for accelerometer range".format(accelRange))
-			return -1
+			raise RuntimeError(f"{accelRange} is not a proper value for accelerometer range")
+
 		accelVal = float(accelRange.split('t')[1].split('G')[0])
 		self.AccelScale = self.cfg.Gravity*accelVal/32767.5
 		return 1
@@ -302,8 +319,8 @@ class MPU9250:
 			self.__writeRegister(self.cfg.GyroConfig, self.cfg[gyroRange])
 			self.GyroRange = gyroRange
 		except:
-			print ("{0} is not a proper value for gyroscope range".format(gyroRange))
-			return -1
+			raise RuntimeError(f"{gyroRange} is not a proper value for gyroscope range")
+
 		gyroVal = float(gyroRange.split('t')[1].split('D')[0])
 		self.GyroScale = self.cfg.Degree2Radian*(gyroVal/32767.5)
 		return 1
@@ -331,8 +348,8 @@ class MPU9250:
 			self.__writeRegister(self.cfg.GyroConfig2, self.cfg[frequency])
 			self.Frequency = frequency
 		except:
-			print ("{0} is not a proper value forlow pass filter".format(frequency))
-			return -1
+			raise RuntimeError(f"{frequency} is not a proper value for low pass filter")
+
 		return 1
 
 	def rotate_mag(self, mag_vals):
@@ -371,7 +388,7 @@ class MPU9250:
 		mag_u16 = (mag_bytes[1::2].astype(np.uint16) << 8) | mag_bytes[0::2].astype(np.uint16)
 		magvals = mag_u16.view(np.int16)
 
-		m_raw = magvals[-3:]
+		m_raw = magvals[0:3]
 		m_raw_r = self.rotate_mag(m_raw)  # rotate to align with accel/gyro frame
 
 		# ---- Calibrate in sensor frame (scale then bias) ----
@@ -380,7 +397,7 @@ class MPU9250:
 		g_cal = (g_raw.astype(np.float64) * self.GyroScale - self.GyroBias)  # GyroBias is calibrated in begin()
 		m_cal = (m_raw_r.astype(np.float64) * self.MagScale  - self.MagBias)   * self.Mags  # converted to Tesla and adjusted
 
-        # ---- Apply hardcoded axis transform to accel/gyro ----
+		# ---- Apply hardcoded axis transform to accel/gyro ----
 		T = self.cfg.transformationMatrixAG    # expected shape (3,3)
 		Tm = self.cfg.transformationMatrixMag  # expected shape (3,3)
 		# This is faster/cleaner than dot + squeeze + transpose
@@ -395,7 +412,8 @@ class MPU9250:
 			# Magtransform is 3x3, do matrix multiply - values will be corrected for soft-iron distortion
 			self.MagVals = self.Magtransform @ m_out
 
-		self.Temp = (temp_raw - self.cfg.TempOffset)/self.cfg.TempScale + self.cfg.TempOffset
+		self.Temp = (temp_raw / self.cfg.TempScale) + self.cfg.TempOffset
+
 
 	def calibrateGyro(self):
 		"""Calibrates gyroscope by finding the bias sets the gyro bias"""
@@ -405,12 +423,12 @@ class MPU9250:
 		currentSRD = self.CurrentSRD
 		self.setGyroRange("GyroRangeSelect250DPS")
 		self.setLowPassFilterFrequency("AccelLowPassFilter20")
-		self.setSRD(19)
+		self.setSRD(19)  # forces acc data rate to ~50 Hz temporarily (with DLPF)
 
 		gyroBias1 = np.array([0.0,0.0,0.0])
 		for i in range(100):
 			self.readSensor()
-			gyroBias1 = gyroBias1 + self.GyroBias + self.GyroVals
+			gyroBias1 += self.GyroVals
 			time.sleep(0.02)
 
 		self.GyroBias = gyroBias1/100.0
@@ -433,7 +451,7 @@ class MPU9250:
 		currentSRD = self.CurrentSRD
 		self.setAccelRange("AccelRangeSelect2G")
 		self.setLowPassFilterFrequency("AccelLowPassFilter20")
-		self.setSRD(19)
+		self.setSRD(19)  # forces acc data rate to ~50 Hz temporarily (with DLPF)
 
 		xbias = []
 		ybias = []
@@ -513,7 +531,7 @@ class MPU9250:
 		"""
 
 		currentSRD = self.CurrentSRD
-		self.setSRD(19)
+		self.setSRD(19)  # forces acc data rate to ~50 Hz temporarily (with DLPF)
 		numSamples = 1000
 		magvals = np.zeros((numSamples,3))
 		for sample in range(1,numSamples):
@@ -544,7 +562,7 @@ class MPU9250:
 		"""
 
 		currentSRD = self.CurrentSRD
-		self.setSRD(19)
+		self.setSRD(19)  # forces acc data rate to ~50 Hz temporarily (with DLPF)
 		numSamples = 1000
 		magvals = np.zeros((numSamples,3))
 		for sample in range(1,numSamples):
@@ -690,11 +708,12 @@ class MPU9250:
 	def __writeRegister(self, subaddress, data):
 
 		self.Bus.write_byte_data(self.cfg.Address, subaddress, data)
-		time.sleep(0.01)
+		time.sleep(0.01)  # small delay to avoid errors in __writeAK8963Register() 
 
+		# Optionally, verify the write:
 		val = self.__readRegisters(subaddress,1)
 		if val[0] != data:
-			print ("It did not write the {0} to the register {1}".format(data, subaddress))
+			print (f"Error: __writeRegister(): did not write the val=0x{data:X} to register=0x{subaddress:X}")
 			return -1
 		return 1
 
@@ -713,7 +732,7 @@ class MPU9250:
 		val = self.__readAK8963Registers(subaddress, 1)
 
 		if val[0] != data:
-			print ("looks like it did not write properly")
+			print (f"Error: __writeAK8963Register(): looks like it did not write val=0x{data:X} to subaddress=0x{subaddress:X} properly")
 		return 1
 
 	def __readAK8963Registers(self, subaddress, count):
@@ -773,7 +792,7 @@ class MPU9250:
 
 
 class NumpyArrayEncoder(JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return JSONEncoder.default(self, obj)
+	def default(self, obj):
+		if isinstance(obj, np.ndarray):
+			return obj.tolist()
+		return JSONEncoder.default(self, obj)
