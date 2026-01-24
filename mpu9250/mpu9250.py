@@ -233,12 +233,10 @@ class MPU9250Node(Node):
         self._imu_raw_msg.linear_acceleration.x = self.imu.AccelVals[0]  # m/s^2
         self._imu_raw_msg.linear_acceleration.y = self.imu.AccelVals[1]
         self._imu_raw_msg.linear_acceleration.z = self.imu.AccelVals[2]
-        self._imu_raw_msg.linear_acceleration_covariance[0] = -1.0
 
         self._imu_raw_msg.angular_velocity.x = self.imu.GyroVals[0]  # rad/s
         self._imu_raw_msg.angular_velocity.y = self.imu.GyroVals[1]
         self._imu_raw_msg.angular_velocity.z = self.imu.GyroVals[2]
-        self._imu_raw_msg.angular_velocity_covariance[0] = -1.0
 
         # No orientation in raw data
         self._imu_raw_msg.orientation_covariance[0] = -1.0
