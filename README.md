@@ -1,6 +1,4 @@
-**Note:** this is a fork with minor changes to the original. It is made to suit Dragger and my other projects. Refer to the origin if in doubt.
-
-See https://github.com/slgrobotics/robots_bringup/tree/main/Docs/Dragger
+**Note:** this is a fork with significant changes to the original. It is made to suit my [Dragger robot](https://github.com/slgrobotics/robots_bringup/tree/main/Docs/Dragger) and my other projects. Refer to the origin if in doubt.
 
 See https://github.com/slgrobotics/robots_bringup/blob/main/Docs/Sensors/MPU9250.md
 
