@@ -162,11 +162,15 @@ class MPU9250Node(Node):
                     self._acc_vec[0]  = self.imu.AccelVals[0]; self._acc_vec[1]  = self.imu.AccelVals[1]; self._acc_vec[2]  = self.imu.AccelVals[2]
 
                     if self.madgwick_use_mag:
-                        self._mag_vec[0] = self.imu.MagVals[1]  # rotated mag values to align with accel/gyro frame
-                        self._mag_vec[1] = self.imu.MagVals[0]
+                        self._mag_vec[0] = self.imu.MagVals[0]
+                        self._mag_vec[1] = self.imu.MagVals[1]
                         self._mag_vec[2] = self.imu.MagVals[2]
 
-                    rpy = self.filter.initialize_from_accel_mag(self._acc_vec[0], self._acc_vec[1], self._acc_vec[2], self._mag_vec[0], self._mag_vec[1], self._mag_vec[2])
+                    # use method that rotates mag values to align with accel/gyro frame
+                    rpy = self.filter.initialize_from_accel_mag(
+                            self._acc_vec[0], self._acc_vec[1], self._acc_vec[2],
+                            self._mag_vec[0], self._mag_vec[1], self._mag_vec[2])
+
                     if rpy[0] is None:
                         self.logger.warning("Madgwick init failed (invalid accel/mag). Keeping identity quaternion.")
                     else:
@@ -253,9 +257,9 @@ class MPU9250Node(Node):
                 self._acc_vec[0]  = self.imu.AccelVals[0]; self._acc_vec[1]  = self.imu.AccelVals[1]; self._acc_vec[2]  = self.imu.AccelVals[2]
 
                 if self.madgwick_use_mag:
-                    self._mag_vec[0] = self.imu.MagVals[1]  # rotated mag values to align with accel/gyro frame
-                    self._mag_vec[1] = -self.imu.MagVals[0]
-                    self._mag_vec[2] = -self.imu.MagVals[2]
+                    self._mag_vec[0] = self.imu.MagVals[0]
+                    self._mag_vec[1] = self.imu.MagVals[1]
+                    self._mag_vec[2] = self.imu.MagVals[2]
                     self.filter.update(self._gyro_vec, self._acc_vec, self._mag_vec)
                 else:
                     self.filter.update(self._gyro_vec, self._acc_vec)
@@ -325,7 +329,7 @@ class MPU9250Node(Node):
 
             # print only when fusion is enabled, and orientation is valid:
             if not self.raw_only:
-                #roll, pitch, yaw = self.filter.quaternion_rpy()      # ENU frame, yaw=0 East
+                #roll, pitch, yaw = self.filter.quaternion_rpy()     # ENU frame, yaw=0 East
                 roll, pitch, yaw = self.filter.quaternion_rpy_nav()  # Navigation frame, yaw=0 North
                 self.logger.info(
                     f"Orientation roll={math.degrees(roll):.2f}, pitch={math.degrees(pitch):.2f}, yaw={math.degrees(yaw):.2f} degrees North"
