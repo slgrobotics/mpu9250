@@ -19,7 +19,6 @@ setup(
     maintainer_email='git@nilsschulte.de',
     description='Driver package for the MPU9250 sensor package',
     license='MIT',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [        
             'mpu9250 = mpu9250.mpu9250:main'

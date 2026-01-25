@@ -688,8 +688,8 @@ class MPU9250:
 
 		The function uses accelerometer and magnetometer values
 		to estimate roll, pitch and yaw. These values could be 
-		having some noise, hence look at kalman and madgwick 
-		filters in filters folder to get a better estimate.
+		having some noise, hence look at madgwick filter
+		in filters folder to get a better estimate.
 		
 		"""
 
