@@ -9,7 +9,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from mpu9250.imusensor.MPU9250 import MPU9250
 
 #
-# see https://github.com/niru-5/imusensor/blob/master/README.md#basic-usage
+# see https://github.com/slgrobotics/robots_bringup/blob/main/Docs/Sensors/MPU9250.md#calibration
+#     https://github.com/niru-5/imusensor/blob/master/README.md#basic-usage
 #
 
 address = 0x68
@@ -42,7 +43,7 @@ print(f"Magtransform: {imu.Magtransform}")
 print("IP: Reading mag values and orientation")
 
 while True:
-    imu.readSensor()
+    imu.readSensor()  # applies calibration internally, if you initialized MagBias, Mags, Magtransform as in the comment above
     imu.computeOrientation()
 
     MagVals_uT = imu.MagVals * 1e6  # convert to microTesla
@@ -58,3 +59,16 @@ while True:
     time.sleep(0.2)
 
 print("Done")
+
+"""
+Rotate the robot in place.
+The published values should roughly conform to the following matrix:
+
+         |   x   |   y   |   z   |
+----------------------------------
+  North  |  20   |   0   |  -40  |
+  East   |   0   |  20   |  -40  |
+  South  | -20   |   0   |  -40  |
+  West   |   0   |  -20  |  -40  |
+----------------------------------
+"""

@@ -8,7 +8,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from mpu9250.imusensor.MPU9250 import MPU9250
 
 #
-# see https://github.com/niru-5/imusensor/blob/master/README.md#basic-usage
+# see https://github.com/slgrobotics/robots_bringup/blob/main/Docs/Sensors/MPU9250.md#calibration
+#     https://github.com/niru-5/imusensor/blob/master/README.md#basic-usage
 #
 
 
@@ -18,7 +19,7 @@ def read_orientation(imu, count, message=""):
         print(message)
     
     for i in range(count):
-        imu.readSensor()
+        imu.readSensor()  # applies calibration internally, when MagBias, Mags, Magtransform are filled after the calibration step
         imu.computeOrientation()
 
         MagVals_uT = imu.MagVals * 1e6  # convert to microTesla
@@ -47,16 +48,21 @@ def main():
     # imu.calibrateGyro()
     # imu.calibrateAccelerometer()
     # or load your own calibration file
-    #imu.loadCalibDataFromFile("/home/pi/calib_real_bolder.json")
-
-    # Note: Make sure you rotate the sensor in 8 shape and cover all the pitch and roll angles.
+    #imu.loadCalibDataFromFile("/tmp/calib_icm_20948.json")
 
     read_orientation(imu, 5, "IP: Reading initial mag values and orientation")
 
     print("calibrating - rotate the sensor in 8 shape and cover all the pitch and roll angles")
 
+    # Note: at this point the initial values for biases and scales in imu object:
+    #		MagBias = np.array([0.0, 0.0, 0.0])
+    #		Mags = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
+    #       Magtransform = None  # magnetometer calibration is unknown. A 3x3 matrix, calculated in calibrateMagPrecise()
+
     #imu.calibrateMagApprox()
     imu.calibrateMagPrecise()
+
+    # Here we have the calculated calibration values in imu object. Print them for a ROS2 launch file:
 
     print()
     print()
@@ -73,6 +79,19 @@ def main():
     print()
 
     input("\nCalibration complete. Press Enter to see calibrated values...")
+
+    """
+    Rotate the robot in place.
+    The published values should roughly conform to the following matrix:
+
+            |   x   |   y   |   z   |
+    ----------------------------------
+    North  |  20   |   0   |  -40  |
+    East   |   0   |  20   |  -40  |
+    South  | -20   |   0   |  -40  |
+    West   |   0   |  -20  |  -40  |
+    ----------------------------------
+    """
 
     read_orientation(bus, 10000, "IP: Reading mag values and orientation after calibration")
 
