@@ -157,6 +157,7 @@ class MPU9250Node(Node):
                 try:
                     # Initial read to set roll/pitch/yaw:
                     self.imu.readSensor()    
+                    self.rotate_mag()       # rotate to align with accel/gyro frame
 
                     # Use bias-corrected accel values:
                     self._acc_vec[0]  = self.imu.AccelVals[0]; self._acc_vec[1]  = self.imu.AccelVals[1]; self._acc_vec[2]  = self.imu.AccelVals[2]
@@ -195,6 +196,23 @@ class MPU9250Node(Node):
 
         self.logger.info("OK: MPU9250 Node: init successful")
 
+    def rotate_mag(self):
+        """
+        Rotate magnetometer reading in place to align with accel+gyro frame.
+        Inputs:
+            mag_values, a numpy.ndarray — a 1D array of 3 float64 values, magnetometer readings
+        Returns:
+            numpy.ndarray — a 1D array of 3 float64 values : rotated magnetometer readings
+        """
+
+        #   Accel/Gyro: X forward, Y left, Z up
+        #   Mag:        X left, Y forward, Z down
+        mx, my, mz = self.imu.MagVals
+
+        self.imu.MagVals[0] =  my
+        self.imu.MagVals[1] =  mx
+        self.imu.MagVals[2] = -mz
+
     def publish_imu_values(self):
         """
         Publishes:
@@ -214,6 +232,7 @@ class MPU9250Node(Node):
         now = self.get_clock().now()
         try:
             self.imu.readSensor()
+            self.rotate_mag()       # rotate to align with accel/gyro frame
         except Exception as e:
             self.logger.error(f"MPU9250 getAgmt() failed: {e}")
             return
