@@ -389,13 +389,15 @@ class MPU9250:
 		magvals = mag_u16.view(np.int16)
 
 		m_raw = magvals[0:3]
-		m_raw_r = self.rotate_mag(m_raw)  # rotate to align with accel/gyro frame
 
 		# ---- Calibrate in sensor frame (scale then bias) ----
 		# Assumption: Bias arrays are in scaled units (same units as raw*scale)
 		a_cal = (a_raw.astype(np.float64) * self.AccelScale - self.AccelBias) * self.Accels
 		g_cal = (g_raw.astype(np.float64) * self.GyroScale - self.GyroBias)  # GyroBias is calibrated in begin()
-		m_cal = (m_raw_r.astype(np.float64) * self.MagScale  - self.MagBias)   * self.Mags  # converted to Tesla and adjusted
+		# Calibration was done on original (x,y,z) readings and don't assume any further frame rotations.
+		m_cal = (m_raw.astype(np.float64) * self.MagScale  - self.MagBias) * self.Mags  # converted to Tesla and adjusted (before rotation)
+
+		m_cal = self.rotate_mag(m_cal)  # rotate to align with accel/gyro frame
 
 		# ---- Apply hardcoded axis transform to accel/gyro ----
 		T = self.cfg.transformationMatrixAG    # expected shape (3,3)
