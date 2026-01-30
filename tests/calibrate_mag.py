@@ -13,8 +13,12 @@ from mpu9250.imusensor.MPU9250 import MPU9250
 #     https://github.com/niru-5/imusensor/blob/master/README.md#basic-usage
 #
 
+imu = None
 
-def read_orientation(imu, count, message=""):
+def read_orientation(count, message=""):
+
+    global imu
+
     """Read and print IMU orientation for specified number of iterations."""
     if message:
         print(message)
@@ -47,6 +51,9 @@ def print_calibration():
     print()
 
 def main():
+
+    global imu
+
     address = 0x68
     bus = SMBus(1)
 
@@ -67,7 +74,7 @@ def main():
     # or load your own calibration file
     #imu.loadCalibDataFromFile("/tmp/calib_icm_20948.json")
 
-    read_orientation(imu, 5, "IP: Reading initial mag values and orientation")
+    read_orientation(5, "IP: Reading initial mag values and orientation")
 
     print("calibrating - rotate the sensor in 8 shape and cover all the pitch and roll angles")
 
@@ -97,7 +104,7 @@ def main():
     ----------------------------------
     """
 
-    read_orientation(bus, 10000, "IP: Reading mag values and orientation after calibration")
+    read_orientation(10000, "IP: Reading mag values and orientation after calibration")
 
     print("Done")
 
