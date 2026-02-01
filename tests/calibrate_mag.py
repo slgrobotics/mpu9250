@@ -35,8 +35,9 @@ def read_orientation(count, message=""):
 
 def print_calibration():
 
+    print("--------------------------------------------------------------------------------")
     print()
-    print("Calibration results: copy this and paste into your ROS2 launch file:")
+    print("---- Calibration results: copy this and paste into your ROS2 launch file:")
     print()
     print("\"magnetometer_scale\": [" + ", ".join(f"{x}" for x in imu.MagScale) + "],  # should be around 1.0")
     print("\"magnetometer_bias\": [" + ", ".join(f"{x}" for x in imu.MagBias) + "],")
@@ -49,6 +50,22 @@ def print_calibration():
             else:
                 print(f"    {row_str}],")
     print()
+    print("---- Calibration results in Python for direct assignment (e.g. into read_mag.py)")
+    print()
+    # MagBias
+    bias_str = ", ".join(f"{v:.16e}" for v in imu.MagBias)
+    print(f"imu.MagBias = np.array([{bias_str}])")
+
+    # Magtransform
+    print("imu.Magtransform = np.array([")
+    for i, row in enumerate(imu.Magtransform):
+        row_str = ", ".join(f"{v:.16e}" for v in row)
+        if i < len(imu.Magtransform) - 1:
+            print(f"    [{row_str}],")
+        else:
+            print(f"    [{row_str}]")
+    print("])")
+    print("--------------------------------------------------------------------------------")
 
 def main():
 
