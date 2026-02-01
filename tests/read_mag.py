@@ -23,27 +23,27 @@ imu.begin()
 
 # Note: initial values for biases and scales in imu object:
 #		MagBias = np.array([0.0, 0.0, 0.0])
-#		Mags = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
+#		MagScale = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
 #       Magtransform = None  # magnetometer calibration is unknown. A 3x3 matrix, calculated in calibrateMagPrecise()
 
 print("OK: IMU initialized")
 
 """
 imu.MagBias = np.array([3.14156455e-05, 6.44644552e-06, 2.43798173e-05])
-imu.Mags = np.array([1., 1., 1.])
+imu.MagScale = np.array([1., 1., 1.])
 imu.Magtransform = np.array([[ 1.05464768, -0.03982411, -0.01269338],
                             [-0.03982411,  0.93736574, -0.01455147],
                             [-0.01269338, -0.01455147,  1.01356064]])
 """
 
 print(f"MagBias: {imu.MagBias}")
-print(f"Mags: {imu.Mags}")
+print(f"MagScale: {imu.MagScale}")
 print(f"Magtransform: {imu.Magtransform}")
 
 print("IP: Reading mag values and orientation")
 
 while True:
-    imu.readSensor()  # applies calibration internally, if you initialized MagBias, Mags, Magtransform as in the comment above
+    imu.readSensor()  # applies calibration internally, if you initialized MagBias, MagScale, Magtransform as in the comment above
     imu.computeOrientation()
 
     MagVals_uT = imu.MagVals * 1e6  # convert to microTesla

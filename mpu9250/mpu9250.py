@@ -65,7 +65,7 @@ class MPU9250Node(Node):
         self.imu.Accels = np.asarray(self.get_parameter('acceleration_scale').get_parameter_value().double_array_value)
         self.imu.AccelBias = np.asarray(self.get_parameter('acceleration_bias').get_parameter_value().double_array_value)
         self.imu.GyroBias = np.asarray(self.get_parameter('gyro_bias').get_parameter_value().double_array_value)
-        self.imu.Mags = np.asarray(self.get_parameter('magnetometer_scale').get_parameter_value().double_array_value)
+        self.imu.MagScale = np.asarray(self.get_parameter('magnetometer_scale').get_parameter_value().double_array_value)
         self.imu.MagBias = np.asarray(self.get_parameter('magnetometer_bias').get_parameter_value().double_array_value)
         self.imu.Magtransform = np.reshape(np.asarray(self.get_parameter('magnetometer_transform').get_parameter_value().double_array_value),(3,3))
 
@@ -157,7 +157,7 @@ class MPU9250Node(Node):
                 try:
                     # Initial read to set roll/pitch/yaw:
                     self.imu.readSensor()    
-                    self.rotate_mag()       # rotate to align with accel/gyro frame
+                    #self.rotate_mag()       # rotate to align with accel/gyro frame
 
                     # Use bias-corrected accel values:
                     self._acc_vec[0]  = self.imu.AccelVals[0]; self._acc_vec[1]  = self.imu.AccelVals[1]; self._acc_vec[2]  = self.imu.AccelVals[2]
@@ -232,7 +232,7 @@ class MPU9250Node(Node):
         now = self.get_clock().now()
         try:
             self.imu.readSensor()
-            self.rotate_mag()       # rotate to align with accel/gyro frame
+            #self.rotate_mag()       # rotate to align with accel/gyro frame
         except Exception as e:
             self.logger.error(f"MPU9250 getAgmt() failed: {e}")
             return

@@ -24,7 +24,7 @@ def read_orientation(count, message=""):
         print(message)
     
     for i in range(count):
-        imu.readSensor()  # applies calibration internally, when MagBias, Mags, Magtransform are filled after the calibration step
+        imu.readSensor()  # applies calibration internally, when MagBias, MagScale, Magtransform are filled after the calibration step
         imu.computeOrientation()
 
         MagVals_uT = imu.MagVals * 1e6  # convert to microTesla
@@ -35,10 +35,11 @@ def read_orientation(count, message=""):
 
 def print_calibration():
 
+    print("--------------------------------------------------------------------------------")
     print()
-    print("Calibration results: copy this and paste into your ROS2 launch file:")
+    print("---- Calibration results: copy this and paste into your ROS2 launch file:")
     print()
-    print("\"magnetometer_scale\": [" + ", ".join(f"{x}" for x in imu.Mags) + "],  # should be around 1.0")
+    print("#\"magnetometer_scale\": [" + ", ".join(f"{x}" for x in imu.MagScale) + "],  # should be 1.0 or omitted if \"magnetometer_transform\" is present")
     print("\"magnetometer_bias\": [" + ", ".join(f"{x}" for x in imu.MagBias) + "],")
     if imu.Magtransform is not None:
         print("\"magnetometer_transform\": [")
@@ -49,6 +50,22 @@ def print_calibration():
             else:
                 print(f"    {row_str}],")
     print()
+    print("---- Calibration results in Python for direct assignment (e.g. into read_mag.py)")
+    print()
+    # MagBias
+    bias_str = ", ".join(f"{v:.16e}" for v in imu.MagBias)
+    print(f"imu.MagBias = np.array([{bias_str}])")
+
+    # Magtransform
+    print("imu.Magtransform = np.array([")
+    for i, row in enumerate(imu.Magtransform):
+        row_str = ", ".join(f"{v:.16e}" for v in row)
+        if i < len(imu.Magtransform) - 1:
+            print(f"    [{row_str}],")
+        else:
+            print(f"    [{row_str}]")
+    print("])")
+    print("--------------------------------------------------------------------------------")
 
 def main():
 
@@ -64,7 +81,7 @@ def main():
 
     # Note: initial values for biases and scales in imu object:
     #		MagBias = np.array([0.0, 0.0, 0.0])
-    #		Mags = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
+    #		MagScale = np.array([1.0, 1.0, 1.0])      # should be 1.0 or omitted if "magnetometer_transform" is present
     #       Magtransform = None  # magnetometer calibration is unknown. A 3x3 matrix, calculated in calibrateMagPrecise()
 
     print("OK: IMU initialized")
@@ -80,7 +97,7 @@ def main():
 
     # Note: at this point the initial values for biases and scales in imu object:
     #		MagBias = np.array([0.0, 0.0, 0.0])
-    #		Mags = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
+    #		MagScale = np.array([1.0, 1.0, 1.0])      # should be 1.0 or omitted if "magnetometer_transform" is present
     #       Magtransform = None  # magnetometer calibration is unknown. A 3x3 matrix, calculated in calibrateMagPrecise()
 
     #imu.calibrateMagApprox()
@@ -93,15 +110,20 @@ def main():
 
     """
     Rotate the robot in place.
-    The published values should roughly conform to the following matrix:
+    The published values (displayed here before ROS2 rotation) should roughly conform to the following matrix:
 
             |   x   |   y   |   z   |
     ----------------------------------
-    North  |  20   |   0   |  -40  |
-    East   |   0   |  20   |  -40  |
-    South  | -20   |   0   |  -40  |
-    West   |   0   |  -20  |  -40  |
+    North  |   0   |   20   |   40  |
+    East   |  20   |    0   |   40  |
+    South  |   0   |  -20   |   40  |
+    West   | -20   |    0   |   40  |
     ----------------------------------
+
+    Note: mag frame will be rotated in the ROS2 node's "rotate_mag()": x,y swapped, z flipped:
+      x =  y
+      y =  x
+      z = -z 
     """
 
     read_orientation(10000, "IP: Reading mag values and orientation after calibration")
