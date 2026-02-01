@@ -39,7 +39,7 @@ def print_calibration():
     print()
     print("---- Calibration results: copy this and paste into your ROS2 launch file:")
     print()
-    print("\"magnetometer_scale\": [" + ", ".join(f"{x}" for x in imu.MagScale) + "],  # should be around 1.0")
+    print("#\"magnetometer_scale\": [" + ", ".join(f"{x}" for x in imu.MagScale) + "],  # should be 1.0 or omitted if \"magnetometer_transform\" is present")
     print("\"magnetometer_bias\": [" + ", ".join(f"{x}" for x in imu.MagBias) + "],")
     if imu.Magtransform is not None:
         print("\"magnetometer_transform\": [")
@@ -81,7 +81,7 @@ def main():
 
     # Note: initial values for biases and scales in imu object:
     #		MagBias = np.array([0.0, 0.0, 0.0])
-    #		MagScale = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
+    #		MagScale = np.array([1.0, 1.0, 1.0])      # should be 1.0 or omitted if "magnetometer_transform" is present
     #       Magtransform = None  # magnetometer calibration is unknown. A 3x3 matrix, calculated in calibrateMagPrecise()
 
     print("OK: IMU initialized")
@@ -97,7 +97,7 @@ def main():
 
     # Note: at this point the initial values for biases and scales in imu object:
     #		MagBias = np.array([0.0, 0.0, 0.0])
-    #		MagScale = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
+    #		MagScale = np.array([1.0, 1.0, 1.0])      # should be 1.0 or omitted if "magnetometer_transform" is present
     #       Magtransform = None  # magnetometer calibration is unknown. A 3x3 matrix, calculated in calibrateMagPrecise()
 
     #imu.calibrateMagApprox()
