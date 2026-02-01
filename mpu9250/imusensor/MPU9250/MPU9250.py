@@ -122,20 +122,20 @@ def getConfigVals():
 	The exact mapping is board- and implementation-dependent, but a common transformation:
 	 - swaps X/Y and
 	 - flips Z	
+
+	Common board info:
+       Accel/Gyro: X forward, Y left, Z up
+       Mag:        X left, Y forward, Z down
+	 
 	"""
 
-	cfg.transformationMatrixAG  = np.array([[0.0,1.0,0.0],[1.0,0.0,0.0],[0.0,0.0,-1.0]]).astype(np.int16)
-	cfg.transformationMatrixMag = np.array([[0.0,1.0,0.0],[1.0,0.0,0.0],[0.0,0.0,-1.0]]).astype(np.int16)
+	cfg.transformationMatrixAG_to_Mag  = np.array([[0.0,1.0,0.0],[1.0,0.0,0.0],[0.0,0.0,-1.0]]).astype(np.int16)  # swap X/Y and flip Z
 
-	cfg.I2CRate = 400000
+	#cfg.I2CRate = 400000
 	cfg.TempScale = 333.87
 	cfg.TempOffset = 21.0
 	cfg.Gravity = 9.807
 	cfg.Degree2Radian = np.pi/180.0
-
-	cfg.acc_t_matrix_ned = np.array([[0.0,-1.0,0.0],[-1.0,0.0,0.0],[0.0,0.0,1.0]]) #np.array([-1.0,1.0,1.0])
-	cfg.gyro_t_matrix_ned = np.array([[0.0,1.0,0.0],[1.0,0.0,0.0],[0.0,0.0,-1.0]]) #np.array([1.0,-1.0,-1.0])
-	cfg.mag_t_matrix_ned = np.array([[0.0,-1.0,0.0],[1.0,0.0,0.0],[0.0,0.0,1.0]])
 
 	return cfg
 
@@ -143,7 +143,7 @@ class MPU9250:
 	"""
 	An interface between MPU9250 and rpi using I2C protocol
 
-	It has various fuctions from calibration to computing orientation
+	It has various functions from calibration to computing orientation
 
 	"""
 
@@ -159,9 +159,9 @@ class MPU9250:
 		self.AccelBias = np.array([0.0, 0.0, 0.0])
 		self.Accels = np.array([1.0, 1.0, 1.0])
 		self.MagBias = np.array([0.0, 0.0, 0.0])   # magnetometer bias derived during calibration
-		self.Mags = np.array([1.0, 1.0, 1.0])      # optional magnetometer scale adjustment
+		self.MagScale = np.array([1.0, 1.0, 1.0])  # optional magnetometer scale adjustment (self.Magtransform not available)
 		self.GyroBias = np.array([0.0, 0.0, 0.0])  # will be set in begin() after short gyro calibration
-		self.Magtransform = None  # magnetometer calibration is unknown
+		self.Magtransform = np.eye(3)  			   # magnetometer calibration is unknown for now
 
 	def begin(self):
 		"""
@@ -212,12 +212,12 @@ class MPU9250:
 		time.sleep(0.1)
 
 		# Accessing the mag's Factory Calibration (Fuse ROM):
-		self.MagScale = self.__readAK8963Registers(self.cfg.Ak8963ASA, 3)
-		self.MagScale = np.array(self.MagScale)
+		self.MagLSB_to_Tesla = self.__readAK8963Registers(self.cfg.Ak8963ASA, 3)
+		self.MagLSB_to_Tesla = np.array(self.MagLSB_to_Tesla)
 		# This "MagScale" official formula converts the register "bits" to Tesla:
-		self.MagScale = (((self.MagScale - 128.0)/256.0) + 1.0)*0.15/1000000.0  # approx 0.15*e-6 Tesla per LSB, on 3 axes
+		self.MagLSB_to_Tesla = (((self.MagLSB_to_Tesla - 128.0)/256.0) + 1.0)*0.15/1000000.0  # approx 0.15*e-6 Tesla per LSB, on 3 axes
 
-		#print(f"Magnetometer Sensitivity Scales: {self.MagScale}  LSB/Tesla")  # MagScale: [1.79882812e-07 1.79882812e-07 1.73437500e-07]
+		#print(f"Magnetometer Sensitivity Scales: {self.MagLSB_to_Tesla}  LSB/Tesla")  # MagScale: [1.79882812e-07 1.79882812e-07 1.73437500e-07]
 
 		self.__writeAK8963Register(self.cfg.Ak8963CNTL1, self.cfg.Ak8963PowerDown)
 		time.sleep(0.1)
@@ -378,24 +378,21 @@ class MPU9250:
 		# Assumption: Bias arrays are in scaled units (same units as raw*scale)
 		a_cal = (a_raw.astype(np.float64) * self.AccelScale - self.AccelBias) * self.Accels
 		g_cal = (g_raw.astype(np.float64) * self.GyroScale - self.GyroBias)  # GyroBias is calibrated in begin()
-		# Calibration was done on original (x,y,z) readings and don't assume any further frame rotations.
-		m_cal = (m_raw.astype(np.float64) * self.MagScale  - self.MagBias) * self.Mags  # converted to Tesla and adjusted (before rotation)
+		m_body_si = m_raw.astype(np.float64) * self.MagLSB_to_Tesla  # raw -> Tesla in sensor-mag frame
 
-		# ---- Apply hardcoded axis transform to accel/gyro ----
-		T = self.cfg.transformationMatrixAG    # expected shape (3,3)
-		Tm = self.cfg.transformationMatrixMag  # expected shape (3,3)
-		# This is faster/cleaner than dot + squeeze + transpose
+		# ---- Apply hardcoded axis transform to accel/gyro to align with mag orientation ----
+		T = self.cfg.transformationMatrixAG_to_Mag    # expected shape (3,3)
 		self.AccelVals = T @ a_cal
 		self.GyroVals  = T @ g_cal
 
-		# ---- Mag optional transform from "magnetometer_transform" parameter ----
-		m_out = Tm @ m_cal
-		if self.Magtransform is None:
-			self.MagVals = m_out
-		else:
-			# Magtransform is 3x3, do matrix multiply - values will be corrected for soft-iron distortion
-			self.MagVals = self.Magtransform @ m_out
+		# ---- Apply magnetometer scaling and calibration ----
+		# hard iron + soft iron (derived in THAT SAME frame)
+		m_corr = (m_body_si - self.MagBias) * self.MagScale   # diag soft-iron (optional)
+		m_corr = self.Magtransform @ m_corr                   # full 3x3 (identity if not used)
 
+		self.MagVals = m_corr
+
+		# ---- compute temperature in degrees Celcius
 		self.Temp = (temp_raw / self.cfg.TempScale) + self.cfg.TempOffset
 
 
@@ -495,7 +492,7 @@ class MPU9250:
 	def __getAccelVals(self):
 
 		accelvals = np.zeros((100,3))
-		for samples in range(1,100):
+		for samples in range(100):
 			self.readSensor()
 			vals = self.AccelVals/self.Accels + self.AccelBias
 			accelvals[samples] = vals
@@ -514,13 +511,18 @@ class MPU9250:
 
 		"""
 
+		# make sure we are not applying calibration in readSensor():
+		self.MagBias[:] = 0.0
+		self.MagScale[:] = 1.0
+		self.Magtransform = np.eye(3)
+
 		currentSRD = self.CurrentSRD
 		self.setSRD(19)  # forces acc data rate to ~50 Hz temporarily (with DLPF)
 		numSamples = 1000
 		magvals = np.zeros((numSamples,3))
-		for sample in range(1,numSamples):
+		for sample in range(numSamples):
 			self.readSensor()
-			magvals[sample] = self.MagVals/self.Mags + self.MagBias
+			magvals[sample] = self.MagVals.copy()
 			time.sleep(0.02)
 			if sample % 10 == 0:
 				print(f"Calibration progress: {sample}/{numSamples} samples", end='\r', flush=True)
@@ -530,7 +532,7 @@ class MPU9250:
 		self.MagBias = (minvals + maxvals)/2.0
 		self.MagBias[2] = -self.MagBias[2]  # change in z bias
 		averageRad = (((maxvals - minvals)/2.0).sum())/3.0
-		self.Mags = ((maxvals - minvals)/2.0)*(1/averageRad)
+		self.MagScale = ((maxvals - minvals)/2.0)*(1/averageRad)
 
 		self.setSRD(currentSRD)
 
@@ -545,13 +547,18 @@ class MPU9250:
 
 		"""
 
+		# make sure we are not applying calibration in readSensor():
+		self.MagBias[:] = 0.0
+		self.MagScale[:] = 1.0
+		self.Magtransform = np.eye(3)
+
 		currentSRD = self.CurrentSRD
 		self.setSRD(19)  # forces acc data rate to ~50 Hz temporarily (with DLPF)
 		numSamples = 1000
 		magvals = np.zeros((numSamples,3))
-		for sample in range(1,numSamples):
+		for sample in range(numSamples):
 			self.readSensor()
-			magvals[sample] = self.MagVals/self.Mags + self.MagBias
+			magvals[sample] = self.MagVals.copy()
 			time.sleep(0.05)
 			if sample % 10 == 0:
 				print(f"Calibration progress: {sample}/{numSamples} samples", end='\r', flush=True)
@@ -582,7 +589,8 @@ class MPU9250:
 					2 * z,
 					1 - 0 * x])
 		d2 = np.array(x * x + y * y + z * z).T # rhs for LLSQ
-		u = np.linalg.solve(D.dot(D.T), D.dot(d2))
+		M = D.dot(D.T)
+		u = np.linalg.solve(M + 1e-9*np.eye(M.shape[0]), D.dot(d2))
 		a = np.array([u[0] + 1 * u[1] - 1])
 		b = np.array([u[0] - 2 * u[1] - 1])
 		c = np.array([u[1] - 2 * u[0] - 1])
@@ -595,15 +603,16 @@ class MPU9250:
 		center = np.linalg.solve(- A[:3, :3], v[6:9])
 
 		translation_matrix = np.eye(4)
-		translation_matrix[3, :3] = center.T
+		translation_matrix[:3, 3] = center
 
 		R = translation_matrix.dot(A).dot(translation_matrix.T)
 
-		evals, evecs = np.linalg.eig(R[:3, :3] / -R[3, 3])
+		S = R[:3, :3] / -R[3, 3]
+		S = 0.5*(S + S.T)
+		evals, evecs = np.linalg.eigh(S)
 		evecs = evecs.T
 
-		radii = np.sqrt(1. / np.abs(evals))
-		radii *= np.sign(evals)
+		radii = np.sqrt(1.0 / np.abs(evals))
 
 		return center, evecs, radii, v
 
@@ -623,7 +632,7 @@ class MPU9250:
 		calibVals['Accels'] = self.Accels
 		calibVals['AccelBias'] = self.AccelBias
 		calibVals['GyroBias'] = self.GyroBias
-		calibVals['Mags'] = self.Mags
+		calibVals['MagScale'] = self.MagScale
 		calibVals['MagBias'] = self.MagBias
 		if self.Magtransform is not None:
 			calibVals['Magtransform'] = self.Magtransform
@@ -662,7 +671,7 @@ class MPU9250:
 			self.Accels = np.asarray(calibVals['Accels'])
 			self.AccelBias = np.asarray(calibVals['AccelBias'])
 			self.GyroBias = np.asarray(calibVals['GyroBias'])
-			self.Mags = np.asarray(calibVals['Mags'])
+			self.MagScale = np.asarray(calibVals['MagScale'])
 			self.MagBias = np.asarray(calibVals['MagBias'])
 			if 'Magtransform' in calibVals.keys():
 				self.Magtransform = np.asarray(calibVals['Magtransform'])
