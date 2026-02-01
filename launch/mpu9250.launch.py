@@ -30,7 +30,7 @@ def generate_launch_description():
                 "acceleration_bias": [0.0, 0.0, 0.0],
                 "gyro_bias": [0.0, 0.0, 0.0],
                 # use tests/calibrate_mag.py to get mag calibration values
-                "magnetometer_scale": [1.0, 1.0, 1.0],  # should be around 1.0
+                #"magnetometer_scale": [1.0, 1.0, 1.0],  # should be 1.0 or omitted if "magnetometer_transform" is present
                 "magnetometer_bias": [1.672994523195427e-05, 1.777942953037992e-05, 3.2817091139903744e-05],
                 "magnetometer_transform": [
                     1.0160951390293467, 0.008597352199034276, -0.008498487872556243,
