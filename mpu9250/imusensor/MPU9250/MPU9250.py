@@ -570,7 +570,6 @@ class MPU9250:
 		transformation = evecs.dot(D).dot(evecs.T)
 
 		self.MagBias = centre
-		self.MagBias[2] = -self.MagBias[2]  # change in z bias
 		self.Magtransform = transformation
 
 		self.setSRD(currentSRD)
