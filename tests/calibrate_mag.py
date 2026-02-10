@@ -109,21 +109,19 @@ def main():
     input("\nCalibration complete. Press Enter to see calibrated values...")
 
     """
+    Run tests/read_mag.py
     Rotate the robot in place.
-    The published values (displayed here before ROS2 rotation) should roughly conform to the following matrix:
+    The published values should roughly conform to the following matrix:
 
-            |   x   |   y   |   z   |
-    ----------------------------------
-    North  |   0   |   20   |   40  |
-    East   |  20   |    0   |   40  |
-    South  |   0   |  -20   |   40  |
-    West   | -20   |    0   |   40  |
-    ----------------------------------
-
-    Note: mag frame will be rotated in the ROS2 node's "rotate_mag()": x,y swapped, z flipped:
-      x =  y
-      y =  x
-      z = -z 
+        ENU    |    x    |    y    |    z    |
+      ----------------------------------------   When robot rotates in place:
+        North  |   +20   |     0   |   -40   |     N -> S  x changes from + to - (y stays the same around 0)
+        East   |     0   |   +20   |   -40   |     E -> W  y changes from + to - (x stays the same around 0)
+        South  |   -20   |     0   |   -40   |     z axis is Up; Earth field in the US typically has negative z (points down into Earth)
+        West   |     0   |   -20   |   -40   |     z shouldn't change much
+      ----------------------------------------
+    values are in microTesla (µT), Earth's field is about 25 to 65 µT depending on location
+    See https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml?#igrfwmm - magnetic field by location (microTesla, NED frame)
     """
 
     read_orientation(10000, "IP: Reading mag values and orientation after calibration")
